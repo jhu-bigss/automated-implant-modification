@@ -1,0 +1,4 @@
+.vscode/
+.spyproject/
+__pycache__/
+*.pyc
