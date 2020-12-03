@@ -1,3 +1,7 @@
+"""
+RoboDK capture images with RealSense camera based on PyQt
+"""
+
 import os, sys, datetime
 
 from PyQt5 import Qt, QtCore

@@ -1,0 +1,10 @@
+# CameraParams from MATLAB
+camera_name: D455
+image_width: 1280
+image_height: 720
+camera_intrinsic:
+  rows: 3
+  cols: 3
+  data: [631.5539, 0.000000, 638.8507, 0.000000, 631.9449, 367.7008, 0.000000, 0.000000, 1.000000]
+radial_distortion:
+  coeffients: [-0.0482, 0.0430]
