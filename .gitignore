@@ -2,3 +2,5 @@
 .spyproject/
 __pycache__/
 *.pyc
+
+data/
