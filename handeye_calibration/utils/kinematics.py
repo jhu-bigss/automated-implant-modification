@@ -1,11 +1,9 @@
 import numpy as np
 from math import *
-#import transformations as tf
 import cv2
 import math
 from pytransform3d.rotations import matrix_from_quaternion, quaternion_from_matrix
 
-dummy = np.array([[0, 0, 0, 1]])
 
 def homogMatfromRotAndTrans(R, tvec):
     """homogMatfromRotAndTrans.
@@ -16,7 +14,7 @@ def homogMatfromRotAndTrans(R, tvec):
     if tvec.shape == (3,):
         tvec = np.expand_dims(tvec, axis=1)
     T = np.concatenate((R, tvec), axis=1)
-    T = np.concatenate((T, dummy), axis=0)
+    T = np.concatenate((T, np.array([[0, 0, 0, 1]])), axis=0)
     return T
 
 def homogeneousInverse(T):
@@ -24,7 +22,7 @@ def homogeneousInverse(T):
     t = T[:3, 3]
     t = np.expand_dims(t, axis=1)
     invT = np.concatenate((R.T, np.dot(-R.T, t)), axis=1)
-    invT = np.concatenate((invT, dummy), axis=0)
+    invT = np.concatenate((invT, np.array([[0, 0, 0, 1]])), axis=0)
     return invT
 
 
@@ -84,7 +82,7 @@ def rotationMatrix(xyz_angle, is_deg, is_homog):
     R = R1.dot(R2).dot(R3)
     if is_homog:
         R = np.hstack((R, np.zeros((3, 1))))
-        R = np.vstack((R, dummy))
+        R = np.vstack((R, np.array([[0, 0, 0, 1]])))
     return R
 
 def translationVector(x, y, z):

@@ -13,14 +13,10 @@ AX=XB
 """
 import cv2
 import numpy as np
-#from utils import kinematics as kin
 from . import kinematics as kin
-#import kinematics as kin
 import time
 import scipy.optimize
 from pytransform3d.rotations import *
-import pudb
-
 
 def Tsai_rank(A, B):
     """Tsai.

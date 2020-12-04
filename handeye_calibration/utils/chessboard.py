@@ -2,14 +2,8 @@ import os
 import cv2
 import numpy as np
 
-DEFAULT_WIDTH = 1280
-DEFAULT_HEIGHT = 720
-DEFAULT_CHESSBOARD_WIDTH = 8
-DEFAULT_CHESSBOARD_HEIGHT = 7
-DEFAULT_CHESSBOARD_SQUARE_SIZE = 30 # mm
-
 class ChessBoard:
-    def __init__(self, image_width=DEFAULT_WIDTH, image_height=DEFAULT_HEIGHT, num_of_width=DEFAULT_CHESSBOARD_WIDTH, num_of_height=DEFAULT_CHESSBOARD_HEIGHT, size_of_square=DEFAULT_CHESSBOARD_SQUARE_SIZE):
+    def __init__(self, image_width, image_height, num_of_width, num_of_height, size_of_square):
 
         self.image_width = image_width
         self.image_height = image_height
@@ -22,7 +16,7 @@ class ChessBoard:
 
         # Prepare object points which had zero value w.r.t z-axis , like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
         self.objp = np.zeros((self.num_of_width * self.num_of_height, 3), np.float32)
-        self.objp[:, :2] = np.mgrid[0:self.num_of_width, 0:self.num_of_height].T.reshape(-1, 2) * self.size_of_square
+        self.objp[:,:2] = np.mgrid[0:self.num_of_width, 0:self.num_of_height].T.reshape(-1, 2) * self.size_of_square
 
         # Arrays to store object points and image points from all the images.
         self.objpoints = []  # 3d point in real world space
@@ -42,7 +36,7 @@ class ChessBoard:
             # If found, add object points, image points (after refining them)
             if ret == True:
                 self.objpoints.append(self.objp)
-                corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), self.criteria)
+                corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), self.criteria) # increase accuracy
                 self.imgpoints.append(corners2)
                 # Draw and display the corners
                 cv2.drawChessboardCorners(frame, (self.num_of_width, self.num_of_height), corners2, ret)
@@ -57,6 +51,7 @@ class ChessBoard:
                 break
         # Calibrate
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(self.objpoints, self.imgpoints, gray.shape[::-1], None, None)
+
         # Re-projection error
         mean_error = 0
         for i in range(len(self.objpoints)):
@@ -66,10 +61,13 @@ class ChessBoard:
         print("total error: {}".format(mean_error / len(self.objpoints)))
         # Save camera parameters
         print('Do you want to save the new result of camera calibration?(y/n)')
-        cam_param_flag = input()
-        if cam_param_flag == 'y':
-            np.savez('data/cam_parameter', mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
-            print('Saved.')
+        cam_param_save_flag = input()
+        if cam_param_save_flag == 'y':
+            calib_file = cv2.FileStorage("camera_params.yaml", cv2.FILE_STORAGE_WRITE)
+            calib_file.write("intrinsic",mtx)
+            calib_file.write("dist_coeff", dist)
+            calib_file.release()
+            print('Camera Parameters saved: ' + os.getcwd() + '/camera_params.yaml')
         else:
             print('Finished. (did not save..)')
 
@@ -77,19 +75,19 @@ class ChessBoard:
         # Check the coordinate of camera
         rect_width = 200
         rect_height = 150
-        length_of_axis = 0.1 # 10 # 0.1
+        length_of_axis = 100 # 10 # 0.1
         interval_time = 10     # ms
         start_point = (int(self.image_width / 2 - rect_width / 2), int(self.image_height / 2 - rect_height / 2))
         end_point = (int(self.image_width / 2 + rect_width / 2), int(self.image_height / 2 + rect_height / 2))
         ref_pts = np.zeros((3, 1))
 
-        cam_calibration_file = 'data/cam_parameter.npz'
-        # Load previously saved data
-        with np.load(cam_calibration_file) as X:
-            mtx, dist, _, _ = [X[i] for i in ('mtx', 'dist', 'rvecs', 'tvecs')]
-            print('Camera parameter\n', mtx)
+        # Load camera calibration
+        calib_file = os.getcwd() + '/camera_params.yaml'
+        calib_file = cv2.FileStorage(calib_file, cv2.FILE_STORAGE_READ)
+        mtx = calib_file.getNode("intrinsic").mat()
+        dist = calib_file.getNode("dist_coeff").mat()
 
-        def draw(img, corners, imgpts):
+        def draw_axis(img, corners, imgpts):
             corner = tuple(corners[0].ravel())
             img = cv2.line(img, corner, tuple(imgpts[0].ravel()), (255, 0, 0), 3)
             img = cv2.line(img, corner, tuple(imgpts[1].ravel()), (0, 255, 0), 3)
@@ -98,7 +96,6 @@ class ChessBoard:
 
         axis = np.float32([[length_of_axis, 0, 0], [0, length_of_axis, 0], [0, 0, -length_of_axis]]).reshape(-1, 3)
 
-        print('Load captured images')
         T_eye2world = np.zeros((1, 4, 4))
         image_cnt = 0
         for frame in caputred_image:
@@ -108,24 +105,16 @@ class ChessBoard:
                 corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), self.criteria)
                 ret, rvecs, tvecs = cv2.solvePnP(self.objp, corners2, mtx, dist)
                 imgpts, jac = cv2.projectPoints(axis, rvecs, tvecs, mtx, dist)
-                img = draw(frame, corners2, imgpts)
-                print('Load', image_cnt, 'th image.' )
+                img = draw_axis(frame, corners2, imgpts)
+                print('Load image', image_cnt)
                 image_cnt += 1
                 cv2.imshow('img', img)
                 cv2.waitKey(interval_time)
                 R_eye2world = np.empty((3, 3))
-                cv2.Rodrigues(rvecs, R_eye2world)
-                # T_eye2world_ = kin.homogMatfromRotAndTrans(R_eye2world, tvecs)
-                dummy = np.array([[0, 0, 0, 1]])
+                cv2.Rodrigues(rvecs, R_eye2world) # Convert rotation vector to a rotation matrix
                 T_eye2world_ = np.concatenate((R_eye2world, tvecs), axis=1)
-                T_eye2world_ = np.concatenate((T_eye2world_, dummy), axis=0)
+                T_eye2world_ = np.concatenate((T_eye2world_, np.array([[0, 0, 0, 1]])), axis=0)
 
                 T_eye2world = np.concatenate((T_eye2world, np.expand_dims(T_eye2world_, axis=0)), axis=0)
 
         return T_eye2world[1:]
-
-    
-if __name__ == "__main__":
-
-    c = ChessBoard()
-    c.estimate_pose(1)

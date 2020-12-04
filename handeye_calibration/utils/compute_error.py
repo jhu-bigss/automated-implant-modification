@@ -1,15 +1,7 @@
-"""
-@File    : compute_error.py
-@Author  : Hyunsoo Shin
-@Date    : 20. 6. 10.
-@Contact : hyunsoo.shin@outlook.com
-"""
 
 import numpy as np
 import matplotlib.pyplot as plt
 from utils import kinematics as kin
-import pudb
-
 
 def woGroundTruth(A, B, X_est, R_tol):
     """woGroundTruth.

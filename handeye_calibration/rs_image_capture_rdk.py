@@ -9,7 +9,7 @@ from PyQt5 import Qt, QtCore
 from robolink import *
 from robodk import *
 
-from camerathread import CameraThread
+from utils.camerathread import CameraThread
 
 DEFAULT_SAVE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
