@@ -13,9 +13,9 @@ KUKA LBR iiwa - automatic implant localization with a RGBD sensor
 		- KUKA Sunrise.Workbench 1.13
 
 ## Requirements
-- Python 3.7 with [NumPy](http://www.numpy.org/), [OpenCV](https://opencv.org/), [pyrealsense2](https://pypi.org/project/pyrealsense/), [robodk](https://pypi.org/project/robodk/). These can be quickly installed/updated by running the following:
+- Python 3.7 with [NumPy](http://www.numpy.org/), [SciPy](https://www.scipy.org/), [OpenCV](https://opencv.org/), [pyrealsense2](https://pypi.org/project/pyrealsense/), [robodk](https://pypi.org/project/robodk/), [pytransform3d](https://github.com/rock-learning/pytransform3d). These can be quickly installed/updated by running the following:
   ```shell
-  pip install numpy opencv-python pyrealsense2 robodk
+  pip install numpy scipy opencv-python pyrealsense2 robodk pytransform3d
   ```
 ## Descreption
 
@@ -23,4 +23,4 @@ KUKA LBR iiwa - automatic implant localization with a RGBD sensor
 
 
 ## TO-DO
-- [ ] Hand-eye Calibration
+- [ ] Capture color and depth images with robot poses
