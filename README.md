@@ -24,3 +24,8 @@ KUKA LBR iiwa - automatic implant localization with a RGBD sensor
 
 ## TO-DO
 - [ ] Capture color and depth images with robot poses
+
+
+## Reference
+- [Hand Eye Calibration](https://github.com/monroe-git/hand-eye)
+- [TSDF](https://github.com/andyzeng/tsdf-fusion-python)
