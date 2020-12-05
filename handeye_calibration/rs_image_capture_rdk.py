@@ -11,7 +11,7 @@ from robodk import *
 
 from utils.camerathread import CameraThread
 
-DEFAULT_SAVE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+data_foler = 'data/'
 
 class MainWidget(Qt.QWidget):
     rdk = Robolink()
@@ -27,7 +27,7 @@ class MainWidget(Qt.QWidget):
         cv_thread = CameraThread(self)
         cv_thread.change_pixmap.connect(self.set_image)
         cv_thread.start()
-        self.save_directory = DEFAULT_SAVE_DIRECTORY
+        self.save_directory = self.create_image_directory(os.path.dirname(os.path.realpath(__file__)))
 
         self.open_dir_button = Qt.QPushButton("Open Folder")
         self.capture_button = Qt.QPushButton("Capture")
@@ -72,22 +72,22 @@ class MainWidget(Qt.QWidget):
         self.cv_label.setPixmap(Qt.QPixmap.fromImage(image))
 
     # create a directory to save captured images 
-    def create_image_directory(self, dir_str):
+    def create_image_directory(self, dir):
+        dir = os.path.join(dir, data_foler)
         now = datetime.datetime.now()
-        dir_str = os.path.join(dir_str, now.strftime("%Y-%m-%d-%H%M%S"))
+        dir = os.path.join(dir, now.strftime("%Y-%m-%d-%H%M%S"))
         try:
-            if not(os.path.isdir(dir_str)):
-                os.makedirs(dir_str)
+            if not(os.path.isdir(dir)):
+                os.makedirs(dir)
         except OSError as e:
-            print("Can't make the directory: %s" % dir_str)
+            print("Can't make the directory: %s" % dir)
             raise
-        return dir_str 
+        return dir
     
     # open an existing directory for calibration
     def open_image_directory(self):
-        dir_str = Qt.QFileDialog.getExistingDirectory(self, 'Open Folder', os.path.dirname(os.path.realpath(__file__)))
-        if dir_str != self.save_directory:
-            self.save_directory = self.create_image_directory(dir_str)
+        dir_open = Qt.QFileDialog.getExistingDirectory(self, 'Open Folder', os.path.dirname(os.path.realpath(__file__)))
+        self.save_directory = self.create_image_directory(dir_open)
 
     # call the opencv thread to save image to the given directory
     def capture_event(self):
@@ -95,8 +95,10 @@ class MainWidget(Qt.QWidget):
 
         # save the robot's current pose
         robot_pose = self.robot.Pose()
-        robot_pose.SaveMat(str(self.pose_counter) + '.txt')
-        print('robot pose: ' + str(self.pose_counter) + '.txt')
+        f_name = 'frame-%06d.pose.txt'%self.pose_counter
+        robot_pose.tr().SaveMat(f_name, separator=' ')
+        shutil.move(os.path.join(os.getcwd(), f_name), self.save_directory)
+        print('robot pose: ' + str(self.pose_counter))
         self.pose_counter += 1
 
     def calibrate_event(self):

@@ -69,7 +69,7 @@ class CameraThread(QtCore.QThread):
 
     @Qt.pyqtSlot(str)
     def save_image(self, save_dir):
-        image_name_absolute_path = os.path.join(save_dir, str(self.image_counter) + '.png')
-        cv2.imwrite(image_name_absolute_path, self.color_image)
-        print('image saved: ' + str(self.image_counter) + '.png')
+        color_image_path = os.path.join(save_dir, "frame-%06d.color.jpg"%(self.image_counter))
+        cv2.imwrite(color_image_path, self.color_image)
+        print('image saved: ' + str(self.image_counter))
         self.image_counter += 1

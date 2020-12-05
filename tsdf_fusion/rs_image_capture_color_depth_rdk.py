@@ -94,10 +94,10 @@ class MainWidget(Qt.QWidget):
 
         # save the robot's current pose
         robot_pose = self.robot.Pose()
-        f_name = str(self.pose_counter) + '.txt'
-        robot_pose.SaveMat(f_name)
+        f_name = 'frame-%06d.pose.txt'%self.pose_counter
+        robot_pose.tr().SaveMat(f_name, separator=' ')
         shutil.move(os.path.join(os.getcwd(), f_name), self.save_directory)
-        print('robot pose: ' + str(self.pose_counter) + '.txt')
+        print('robot pose: ' + str(self.pose_counter))
         self.pose_counter += 1
 
     def run_tsdf_event(self):
