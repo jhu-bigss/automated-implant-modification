@@ -103,6 +103,7 @@ if __name__ == "__main__":
         pos_e, ori_e = compute_error.woGroundTruth(T_robot, T_eye, X_est, R_tol)
         err = pos_e + ori_e
         min_idx = np.argmin(err)
+        np.set_printoptions(suppress=True)
         print('X(at the minumum error):')
         print(X_est[min_idx])
         
