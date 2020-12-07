@@ -6,13 +6,13 @@ import numpy as np
 from utils import fusion
 
 
-vol_center = np.array([0.50, 0, 0.45]) 
-vol_width = 0.5
-vol_height = 0.05
+vol_center = np.array([500, 0, 450]) 
+vol_width = 800
+vol_height = 80
 vol_bnds = np.zeros((3,2))
-vol_bnds[:,0] = vol_center - np.array([vol_width, vol_width, vol_height])
-vol_bnds[:,1] = vol_center + np.array([vol_width, vol_width, vol_height])
-print(vol_bnds)
+vol_bnds[:,0] = vol_center - np.array([vol_width/2, vol_width/2, vol_height/2])
+vol_bnds[:,1] = vol_center + np.array([vol_width/2, vol_width/2, vol_height/2])
+vol_size = 1 # mm
 
 if __name__ == "__main__":
   # ======================================================================================================== #
@@ -25,9 +25,8 @@ if __name__ == "__main__":
   cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
   for i in range(n_imgs):
     # Read depth image and camera pose
-    depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float)
-    depth_im /= 1000.  # depth is saved in 16-bit PNG in millimeters
-    depth_im[depth_im == 65.535] = 0  # invalid depth is set to 65535
+    depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float) # depth is saved in 16-bit PNG in millimeters
+    depth_im[depth_im == 65535] = 0  # invalid depth is set to 65535
     cam_pose = np.loadtxt("data/frame-%06d.pose.txt"%(i))  # 4x4 rigid transformation matrix
 
     # Compute camera view frustum and extend convex hull
@@ -41,7 +40,7 @@ if __name__ == "__main__":
   # ======================================================================================================== #
   # Initialize voxel volume
   print("Initializing voxel volume...")
-  tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=0.001)
+  tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=vol_size)
 
   # Loop through RGB-D images and fuse them together
   t0_elapse = time.time()
@@ -51,8 +50,7 @@ if __name__ == "__main__":
     # Read RGB-D image and camera pose
     color_image = cv2.cvtColor(cv2.imread("data/frame-%06d.color.jpg"%(i)), cv2.COLOR_BGR2RGB)
     depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float)
-    depth_im /= 1000.
-    depth_im[depth_im == 65.535] = 0
+    depth_im[depth_im == 65535] = 0
     cam_pose = np.loadtxt("data/frame-%06d.pose.txt"%(i))
 
     # Integrate observation into voxel volume (assume color aligned with depth)
