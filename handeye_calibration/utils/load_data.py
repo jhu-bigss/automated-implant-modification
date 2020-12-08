@@ -17,7 +17,7 @@ def read_robot_pose_from_dir(path):
     pose_txt_list = sorted(glob.glob(path + "*.txt"))
     robot_poses = []
     for file in pose_txt_list:
-        pose = np.loadtxt(file, delimiter=',', usecols=range(4), unpack=True, dtype=float)
+        pose = np.loadtxt(file, delimiter=' ', usecols=range(4), dtype=float)
         robot_poses.append(pose)
     robot_poses = np.array(robot_poses)
 
