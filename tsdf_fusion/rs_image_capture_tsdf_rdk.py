@@ -2,7 +2,7 @@
 RoboDK capture images with RealSense camera based on PyQt
 """
 
-import os, sys, shutil
+import os, sys, shutil, time, glob
 import numpy as np
 import cv2
 
@@ -33,13 +33,25 @@ class MainWidget(Qt.QWidget):
         cv_thread.start()
 
         # create default save folder
-        self.save_directory = self.create_data_directory(os.path.dirname(os.path.realpath(__file__)))
+        self.data_directory = self.create_data_directory(os.path.dirname(os.path.realpath(__file__)))
 
         self.open_dir_button = Qt.QPushButton("Save Folder")
         self.toggle_view_mode_button = Qt.QPushButton("View Mode")
         self.toggle_view_mode_button.setCheckable(True)
         self.toggle_view_mode_button.setStyleSheet("background-color : lightgrey")
         self.capture_button = Qt.QPushButton("Capture")
+
+        # Parameters for TSDF
+        self.vol_bottom_center_wrt_robot_base = np.array([500, 0, 450])
+        self.vol_width_dspinbox = Qt.QDoubleSpinBox()
+        self.vol_width_dspinbox.setMaximum(1000)
+        self.vol_width_dspinbox.setValue(800)
+        self.vol_height_dspinbox = Qt.QDoubleSpinBox()
+        self.vol_height_dspinbox.setMaximum(500)
+        self.vol_height_dspinbox.setValue(80)
+        self.vol_marching_cube_size = Qt.QDoubleSpinBox()
+        self.vol_marching_cube_size.setSingleStep(0.1)
+        self.vol_marching_cube_size.setValue(1)
         self.calibrate_button = Qt.QPushButton("Run TSDF")
 
         self.open_dir_button.clicked.connect(self.open_data_directory)
@@ -47,13 +59,23 @@ class MainWidget(Qt.QWidget):
         self.capture_button.clicked.connect(self.capture_event)
         self.calibrate_button.clicked.connect(self.run_tsdf)
 
+        # GUI layouts
         vlayout = Qt.QVBoxLayout()
         vlayout.addWidget(self.cv_label)
+        hlayout_0 = Qt.QHBoxLayout()
+        hlayout_0.addWidget(self.open_dir_button)
+        hlayout_0.addWidget(self.toggle_view_mode_button)
+        hlayout_0.addWidget(self.capture_button)
+        hlayout_0.addWidget(self.calibrate_button)
+        vlayout.addLayout(hlayout_0)
         hlayout_1 = Qt.QHBoxLayout()
-        hlayout_1.addWidget(self.open_dir_button)
-        hlayout_1.addWidget(self.toggle_view_mode_button)
-        hlayout_1.addWidget(self.capture_button)
-        hlayout_1.addWidget(self.calibrate_button)
+        hlayout_1.addWidget(Qt.QLabel("TSDF Parameters: "))
+        hlayout_1.addWidget(Qt.QLabel("Width"))
+        hlayout_1.addWidget(self.vol_width_dspinbox)
+        hlayout_1.addWidget(Qt.QLabel("Height"))
+        hlayout_1.addWidget(self.vol_height_dspinbox)
+        hlayout_1.addWidget(Qt.QLabel("Resolution"))
+        hlayout_1.addWidget(self.vol_marching_cube_size)
         vlayout.addLayout(hlayout_1)
         vlayout.setContentsMargins(0,0,0,0)
         self.setLayout(vlayout)
@@ -95,7 +117,7 @@ class MainWidget(Qt.QWidget):
     # open a new directory for saving data
     def open_data_directory(self):
         dir_open = Qt.QFileDialog.getExistingDirectory(self, 'Select Save Folder', os.path.dirname(os.path.realpath(__file__)))
-        self.save_directory = self.create_data_directory(dir_open)
+        self.data_directory = self.create_data_directory(dir_open)
 
     def change_view_mode(self):
         if self.toggle_view_mode_button.isChecked():
@@ -107,51 +129,35 @@ class MainWidget(Qt.QWidget):
 
     # call the opencv thread to save image to the given directory
     def capture_event(self):
-        self.image_captured.emit(self.save_directory)
+        self.image_captured.emit(self.data_directory)
 
         # save the robot's current pose
         robot_pose = self.robot.Pose()
         f_name = 'frame-%06d.pose.txt'%self.pose_counter
         robot_pose.tr().SaveMat(f_name, separator=' ')
-        shutil.move(os.path.join(os.getcwd(), f_name), os.path.join(self.save_directory, f_name))
+        shutil.move(os.path.join(os.getcwd(), f_name), os.path.join(self.data_directory, f_name))
         print('robot pose: ' + str(self.pose_counter))
         self.pose_counter += 1
 
     def run_tsdf(self):
-        vol_center = np.array([500, 0, 450]) 
-        vol_width = 800
-        vol_height = 80
         vol_bnds = np.zeros((3,2))
-        vol_bnds[:,0] = vol_center - np.array([vol_width/2, vol_width/2, vol_height/2])
-        vol_bnds[:,1] = vol_center + np.array([vol_width/2, vol_width/2, vol_height/2])
-        vol_size = 1 # mm
-
-        # ======================================================================================================== #
-        # (Optional) This is an example of how to compute the 3D bounds
-        # in world coordinates of the convex hull of all camera view
-        # frustums in the dataset
-        # ======================================================================================================== #
-        print("Estimating voxel volume bounds...")
-        n_imgs = 11
-        cam_intr = np.loadtxt("data/camera-intrinsics.txt", delimiter=' ')
-        for i in range(n_imgs):
-            # Read depth image and camera pose
-            depth_im = cv2.imread("data/frame-%06d.depth.png"%(i),-1).astype(float) # depth is saved in 16-bit PNG in millimeters
-            depth_im[depth_im == 65535] = 0  # invalid depth is set to 65535
-            cam_pose = np.loadtxt("data/frame-%06d.pose.txt"%(i))  # 4x4 rigid transformation matrix
-
-            # Compute camera view frustum and extend convex hull
-            # view_frust_pts = fusion.get_view_frustum(depth_im, cam_intr, cam_pose)
-            # vol_bnds[:,0] = np.minimum(vol_bnds[:,0], np.amin(view_frust_pts, axis=1))
-            # vol_bnds[:,1] = np.maximum(vol_bnds[:,1], np.amax(view_frust_pts, axis=1))
-        # ======================================================================================================== #
+        vol_bnds[:,0] = self.vol_bottom_center_wrt_robot_base - np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
+        vol_bnds[:,1] = self.vol_bottom_center_wrt_robot_base + np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
 
         # ======================================================================================================== #
         # Integrate
         # ======================================================================================================== #
         # Initialize voxel volume
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=vol_size)
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=self.vol_marching_cube_size.value())
+
+        # Detect how many frames in data directory
+        n_imgs = len(glob.glob1(self.data_directory, "*.jpg"))
+
+        # Load camera intrinsics
+        calib_file = os.path.join(self.data_directory ,'camera_params.yaml')
+        calib_file = cv2.FileStorage(calib_file, cv2.FILE_STORAGE_READ)
+        cam_intr = calib_file.getNode("intrinsic").mat()
 
         # Loop through RGB-D images and fuse them together
         t0_elapse = time.time()
@@ -179,6 +185,8 @@ class MainWidget(Qt.QWidget):
         print("Saving point cloud to pc.ply...")
         point_cloud = tsdf_vol.get_point_cloud()
         fusion.pcwrite("pc.ply", point_cloud)
+
+        print("=====>Done<=====")
 
 if __name__ == '__main__':
     app = Qt.QApplication(sys.argv)
