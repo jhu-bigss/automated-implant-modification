@@ -23,7 +23,7 @@ KUKA LBR iiwa - automatic implant localization with a RGBD sensor
 
 
 ## TO-DO
-- [ ] Capture color and depth images with robot poses
+- [ ] Automatic path planning and scanning
 
 
 ## Reference
