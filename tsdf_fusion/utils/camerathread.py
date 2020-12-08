@@ -11,6 +11,8 @@ DEFAULT_WIDTH = 1280
 DEFAULT_HEIGHT = 720
 DEFAULT_FPS = 30
 
+clipping_distance_in_meters = 1
+
 class CameraThread(QtCore.QThread):
 
     change_pixmap = QtCore.pyqtSignal(Qt.QImage)
@@ -25,14 +27,24 @@ class CameraThread(QtCore.QThread):
         config.enable_stream(rs.stream.color, width, height, rs.format.bgr8, fps)
         
         # start streaming
-        self.pipeline.start(config)
+        profile = self.pipeline.start(config)
+        self.view_mode_bg_removed = False
         self.running = True
         print("start realsense!")
+
+        # Getting the depth sensor's depth scale (see rs-align example for explanation)
+        depth_sensor = profile.get_device().first_depth_sensor()
+        depth_scale = depth_sensor.get_depth_scale()
+        # print("Depth Scale is: " , depth_scale)
+
+        # We will be removing the background of objects more than clipping_distance_in_meters meters away
+        self.clipping_distance = clipping_distance_in_meters / depth_scale
         
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
         self.align = rs.align(rs.stream.color) # align to color frame
 
+        parent.view_mode_changed.connect(self.change_view_mode)
         parent.image_captured.connect(self.save_image)
         parent.window_closed.connect(self.stop)
 
@@ -59,11 +71,16 @@ class CameraThread(QtCore.QThread):
                 self.depth_image = np.asanyarray(depth_frame.get_data())
                 self.color_image = np.asanyarray(color_frame.get_data())
 
-                # depth image must be converted to 8-bit per pixel first
-                depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(self.depth_image, alpha=0.03), cv2.COLORMAP_JET)
-
-                # Stack both images horizontally
-                images = np.hstack((self.color_image, depth_colormap))
+                if self.view_mode_bg_removed:
+                    # Remove background - Set pixels further than clipping_distance to grey
+                    grey_color = 153
+                    depth_image_3d = np.dstack((self.depth_image, self.depth_image, self.depth_image)) #depth image is 1 channel, color is 3 channels
+                    images = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= 0), grey_color, self.color_image)
+                else:
+                    # depth image must be converted to 8-bit per pixel first
+                    depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(self.depth_image, alpha=0.03), cv2.COLORMAP_JET)
+                    # Stack both images horizontally
+                    images = np.hstack((self.color_image, depth_colormap))
 
                 # convert BGR (opencv) to RGB (QImage)
                 # ref: https://stackoverflow.com/a/55468544/6622587
@@ -72,7 +89,11 @@ class CameraThread(QtCore.QThread):
                 h, w, ch = images.shape
                 bytesPerLine = ch * w
                 color_qimage = Qt.QImage(color_image.data, w, h, bytesPerLine, Qt.QImage.Format_RGB888)
-                color_qimage = color_qimage.scaled(640 * 2, 480, QtCore.Qt.KeepAspectRatio)
+                if self.view_mode_bg_removed:
+                    color_qimage = color_qimage.scaled(640, 480, QtCore.Qt.KeepAspectRatio)
+                else:
+                    color_qimage = color_qimage.scaled(640 * 2, 480, QtCore.Qt.KeepAspectRatio)
+                    
                 self.change_pixmap.emit(color_qimage)
 
         finally:
@@ -80,12 +101,9 @@ class CameraThread(QtCore.QThread):
             # self.pipeline.stop()
             pass
 
-    @Qt.pyqtSlot()
-    def stop(self):
-        self.running = False
-        self.pipeline.stop()
-        print("close realsense.")
-        self.quit()
+    @Qt.pyqtSlot(bool)
+    def change_view_mode(self, view_mode):
+        self.view_mode_bg_removed = view_mode
 
     @Qt.pyqtSlot(str)
     def save_image(self, save_dir):
@@ -95,3 +113,10 @@ class CameraThread(QtCore.QThread):
         cv2.imwrite(color_image_path, self.color_image)
         print('save image: ' + str(self.image_counter))
         self.image_counter += 1
+
+    @Qt.pyqtSlot()
+    def stop(self):
+        self.running = False
+        self.pipeline.stop()
+        print("close realsense.")
+        self.quit()
