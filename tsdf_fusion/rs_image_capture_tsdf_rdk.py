@@ -9,12 +9,16 @@ import cv2
 from PyQt5 import Qt, QtCore
 
 from robolink import *
-from robodk import *
+from robodk import robodk
 
 from utils.camerathread import CameraThread
 from utils import fusion
 
 data_foler = 'data/'
+reference_frame_wrt_robot_base = [500, 0, 450]
+auto_scan_camera_to_object_distance = 350
+auto_scan_tilt_angles = [80, 50]
+auto_scan_planer_swing_angles = [-45, -30, -15, 0, 15, 30, 45]
 
 class MainWidget(Qt.QWidget):
     rdk = Robolink()
@@ -39,10 +43,13 @@ class MainWidget(Qt.QWidget):
         self.toggle_view_mode_button = Qt.QPushButton("View Mode")
         self.toggle_view_mode_button.setCheckable(True)
         self.toggle_view_mode_button.setStyleSheet("background-color : lightgrey")
+        self.toggle_tsdf_mode_button = Qt.QPushButton("TSDF Mode")
+        self.toggle_tsdf_mode_button.setCheckable(True)
+        self.toggle_tsdf_mode_button.setStyleSheet("background-color : lightgrey")
         self.capture_button = Qt.QPushButton("Capture")
 
-        # Parameters for TSDF
-        self.vol_bottom_center_wrt_robot_base = np.array([500, 0, 450])
+        # Parameters inputs for TSDF
+        self.vol_bottom_center_wrt_robot_base = np.array(reference_frame_wrt_robot_base)
         self.vol_width_dspinbox = Qt.QDoubleSpinBox()
         self.vol_width_dspinbox.setMaximum(1000)
         self.vol_width_dspinbox.setValue(800)
@@ -52,12 +59,13 @@ class MainWidget(Qt.QWidget):
         self.vol_marching_cube_size = Qt.QDoubleSpinBox()
         self.vol_marching_cube_size.setSingleStep(0.1)
         self.vol_marching_cube_size.setValue(1)
-        self.calibrate_button = Qt.QPushButton("Run TSDF")
+        self.run_tsdf_button = Qt.QPushButton("Run TSDF")
 
         self.open_dir_button.clicked.connect(self.open_data_directory)
         self.toggle_view_mode_button.clicked.connect(self.change_view_mode)
+        self.toggle_tsdf_mode_button.clicked.connect(self.change_tsdf_mode)
         self.capture_button.clicked.connect(self.capture_event)
-        self.calibrate_button.clicked.connect(self.run_tsdf)
+        self.run_tsdf_button.clicked.connect(self.run_tsdf)
 
         # GUI layouts
         vlayout = Qt.QVBoxLayout()
@@ -65,8 +73,9 @@ class MainWidget(Qt.QWidget):
         hlayout_0 = Qt.QHBoxLayout()
         hlayout_0.addWidget(self.open_dir_button)
         hlayout_0.addWidget(self.toggle_view_mode_button)
+        hlayout_0.addWidget(self.toggle_tsdf_mode_button)
         hlayout_0.addWidget(self.capture_button)
-        hlayout_0.addWidget(self.calibrate_button)
+        hlayout_0.addWidget(self.run_tsdf_button)
         vlayout.addLayout(hlayout_0)
         hlayout_1 = Qt.QHBoxLayout()
         hlayout_1.addWidget(Qt.QLabel("TSDF Parameters: "))
@@ -82,6 +91,10 @@ class MainWidget(Qt.QWidget):
 
         # RoboDK stuff
         self.robot = self.rdk.Item('', ITEM_TYPE_ROBOT)
+        self.ref_frame = self.rdk.Item('Reference', ITEM_TYPE_FRAME)
+        if not self.ref_frame.Valid():
+            self.ref_frame = self.rdk.AddFrame('Reference')
+            self.ref_frame.setPose(robodk.transl(*reference_frame_wrt_robot_base))
         self.pose_counter = 0
 
         if show:
@@ -121,23 +134,60 @@ class MainWidget(Qt.QWidget):
 
     def change_view_mode(self):
         if self.toggle_view_mode_button.isChecked():
+            self.toggle_view_mode_button.setText("Depth View")
             self.toggle_view_mode_button.setStyleSheet("background-color : lightblue")
             self.view_mode_changed.emit(True)
         else:
+            self.toggle_view_mode_button.setText("Color View")
             self.toggle_view_mode_button.setStyleSheet("background-color : lightgrey")
             self.view_mode_changed.emit(False)
+    
+    def change_tsdf_mode(self):
+        if self.toggle_tsdf_mode_button.isChecked():
+            self.toggle_tsdf_mode_button.setText("Automatic")
+            self.toggle_tsdf_mode_button.setStyleSheet("background-color : lightblue")
+            self.capture_button.setText("Start")
+            self.run_tsdf_button.setEnabled(False)
+        else:
+            self.toggle_tsdf_mode_button.setText("Manual")
+            self.toggle_tsdf_mode_button.setStyleSheet("background-color : lightgrey")
+            self.capture_button.setText("Capture")
+            self.run_tsdf_button.setEnabled(True)
 
-    # call the opencv thread to save image to the given directory
     def capture_event(self):
-        self.image_captured.emit(self.data_directory)
+        if self.toggle_tsdf_mode_button.isChecked():
+            # Automatic mode
+            target_list = self.generate_automatic_poses()
+        else:
+            # Manual mode
+            self.image_captured.emit(self.data_directory) # call the opencv thread to save image to the given directory
 
-        # save the robot's current pose
-        robot_pose = self.robot.Pose()
-        f_name = 'frame-%06d.pose.txt'%self.pose_counter
-        robot_pose.tr().SaveMat(f_name, separator=' ')
-        shutil.move(os.path.join(os.getcwd(), f_name), os.path.join(self.data_directory, f_name))
-        print('robot pose: ' + str(self.pose_counter))
-        self.pose_counter += 1
+            # save the robot's current pose
+            robot_pose = self.robot.Pose()
+            f_name = 'frame-%06d.pose.txt'%self.pose_counter
+            robot_pose.tr().SaveMat(f_name, separator=' ')
+            shutil.move(os.path.join(os.getcwd(), f_name), os.path.join(self.data_directory, f_name))
+            print('robot pose: ' + str(self.pose_counter))
+            self.pose_counter += 1
+
+    def generate_automatic_poses(self):
+
+        target_list = []
+        r = auto_scan_camera_to_object_distance
+
+        for tilt_angle in auto_scan_tilt_angles:
+            for swing_angle in auto_scan_planer_swing_angles:
+                x = - r * robodk.cos(swing_angle*robodk.pi/180) * robodk.cos(tilt_angle*robodk.pi/180)
+                y = r * robodk.sin(swing_angle*robodk.pi/180) 
+                z = r * robodk.cos(swing_angle*robodk.pi/180) * robodk.sin(tilt_angle*robodk.pi/180)
+                pose_offset_from_ref = robodk.Offset(self.ref_frame, x, y, z)
+                print(pose_offset_from_ref)
+                # TODO: Working on camera orientation
+                self.robot.setPose(pose_offset_from_ref*robodk.rotz((90-swing_angle)*robodk.pi/180))
+                self.rdk.AddTarget(str(self.pose_counter))
+                self.pose_counter += 1
+
+        return target_list
 
     def run_tsdf(self):
         vol_bnds = np.zeros((3,2))
