@@ -15,6 +15,7 @@ from utils.camerathread import CameraThread
 from utils import fusion
 
 data_foler = 'data/'
+
 reference_frame_wrt_robot_base = [772, -8, 410]
 auto_scan_camera_to_object_distance = 600
 auto_scan_tilt_angles = [80, 60]

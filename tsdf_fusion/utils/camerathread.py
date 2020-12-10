@@ -7,23 +7,19 @@ import pyrealsense2 as rs
 
 import numpy as np
 
-DEFAULT_WIDTH = 1280
-DEFAULT_HEIGHT = 720
-DEFAULT_FPS = 30
-
 clipping_distance_in_meters = 1
 
 class CameraThread(QtCore.QThread):
 
     change_pixmap = QtCore.pyqtSignal(Qt.QImage)
 
-    def __init__(self, parent=None, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fps=DEFAULT_FPS):
+    def __init__(self, parent=None, width=1280, height=720, fps=60):
         super().__init__()
         
         # Declare RealSense pipelineline 
         self.pipeline = rs.pipeline()
         config = rs.config()
-        config.enable_stream(rs.stream.depth, width, height, rs.format.z16, fps)
+        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, fps)
         config.enable_stream(rs.stream.color, width, height, rs.format.bgr8, fps)
         
         # start streaming
