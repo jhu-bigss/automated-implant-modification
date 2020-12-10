@@ -150,14 +150,14 @@ class MainWidget(Qt.QWidget):
 
         # Load data
         T_robot = load_data.read_robot_pose_from_dir(self.data_directory)
-        T_eye = load_data.read_image_from_dir(self.data_directory)
+        T_eye = load_data.read_chessboard_image_from_dir(self.data_directory)
         num_of_poses = len(T_eye)
         if num_of_poses != len(T_robot):
             print("WARNING: load robot poses not equal to the number of images.")
 
         # To validate the new pose using the estimated result
         # T_robot_vali = load_data.read_robot_pose_from_dir(validate_folder)
-        # T_eye_vali = load_data.read_image_from_dir(validate_folder)
+        # T_eye_vali = load_data.read_chessboard_image_from_dir(validate_folder)
 
         min_num_pose = 9
         max_num_pose = len(T_eye)

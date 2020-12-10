@@ -7,15 +7,11 @@ import pyrealsense2 as rs
 
 import numpy as np
 
-DEFAULT_WIDTH = 1280
-DEFAULT_HEIGHT = 720
-DEFAULT_FPS = 30
-
 class CameraThread(QtCore.QThread):
 
     change_pixmap = QtCore.pyqtSignal(Qt.QImage)
 
-    def __init__(self, parent=None, stream_type=rs.stream.color, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, fps=DEFAULT_FPS):
+    def __init__(self, parent=None, stream_type=rs.stream.color, width=1280, height=720, fps=60):
         super().__init__()
         
         # Declare RealSense pipelineline 
