@@ -7,10 +7,6 @@ import cv2
 import os
 import datetime
 
-DEFAULT_WIDTH = 1280
-DEFAULT_HEIGHT = 720
-DEFAULT_FPS = 30
-
 # create a directory to save captured images 
 def create_image_directory():
     now = datetime.datetime.now()
@@ -26,8 +22,8 @@ def create_image_directory():
 # Configure depth and color streams
 pipeline = rs.pipeline()
 config = rs.config()
-config.enable_stream(rs.stream.depth, DEFAULT_WIDTH, DEFAULT_HEIGHT, rs.format.z16, DEFAULT_FPS)
-config.enable_stream(rs.stream.color, DEFAULT_WIDTH, DEFAULT_HEIGHT, rs.format.bgr8, DEFAULT_FPS)
+config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
+config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 60)
 
 # Start streaming
 pipeline.start(config)
