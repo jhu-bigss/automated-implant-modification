@@ -15,10 +15,11 @@ from utils.camerathread import CameraThread
 from utils import fusion
 
 data_foler = 'data/'
-reference_frame_wrt_robot_base = [500, 0, 450]
-auto_scan_camera_to_object_distance = 350
-auto_scan_tilt_angles = [80, 50]
-auto_scan_planer_swing_angles = [-45, -30, -15, 0, 15, 30, 45]
+reference_frame_wrt_robot_base = [772, -8, 410]
+auto_scan_camera_to_object_distance = 600
+auto_scan_tilt_angles = [80, 60]
+auto_scan_planer_swing_angles = [[-20, 0, 20],
+                                 [-45, -30, -15, 0, 15, 30, 45]]
 
 class MainWidget(Qt.QWidget):
     rdk = Robolink()
@@ -52,10 +53,10 @@ class MainWidget(Qt.QWidget):
         self.vol_bottom_center_wrt_robot_base = np.array(reference_frame_wrt_robot_base)
         self.vol_width_dspinbox = Qt.QDoubleSpinBox()
         self.vol_width_dspinbox.setMaximum(1000)
-        self.vol_width_dspinbox.setValue(800)
+        self.vol_width_dspinbox.setValue(300)
         self.vol_height_dspinbox = Qt.QDoubleSpinBox()
-        self.vol_height_dspinbox.setMaximum(500)
-        self.vol_height_dspinbox.setValue(80)
+        self.vol_height_dspinbox.setMaximum(200)
+        self.vol_height_dspinbox.setValue(50)
         self.vol_marching_cube_size = Qt.QDoubleSpinBox()
         self.vol_marching_cube_size.setSingleStep(0.1)
         self.vol_marching_cube_size.setValue(1)
@@ -157,41 +158,77 @@ class MainWidget(Qt.QWidget):
     def capture_event(self):
         if self.toggle_tsdf_mode_button.isChecked():
             # Automatic mode
-            target_list = self.generate_automatic_poses()
+            targets = self.generate_automatic_poses()
+            if self.connect_robot():
+                for i, target in enumerate(targets):
+                    self.robot.MoveJ(target)
+                    self.robot.WaitMove(10) # in seconds
+                    self.image_captured.emit(self.data_directory)
+                    self.save_robot_pose(i)
+                self.robot.Disconnect()
+            
+            self.run_tsdf()
+
         else:
             # Manual mode
             self.image_captured.emit(self.data_directory) # call the opencv thread to save image to the given directory
-
-            # save the robot's current pose
-            robot_pose = self.robot.Pose()
-            f_name = 'frame-%06d.pose.txt'%self.pose_counter
-            robot_pose.tr().SaveMat(f_name, separator=' ')
-            shutil.move(os.path.join(os.getcwd(), f_name), os.path.join(self.data_directory, f_name))
-            print('robot pose: ' + str(self.pose_counter))
+            self.save_robot_pose(self.save_robot_pose)
             self.pose_counter += 1
 
     def generate_automatic_poses(self):
-
         target_list = []
         r = auto_scan_camera_to_object_distance
+        pose_counter = 0
 
-        for tilt_angle in auto_scan_tilt_angles:
-            for swing_angle in auto_scan_planer_swing_angles:
-                x = - r * robodk.cos(swing_angle*robodk.pi/180) * robodk.cos(tilt_angle*robodk.pi/180)
-                y = r * robodk.sin(swing_angle*robodk.pi/180) 
-                z = r * robodk.cos(swing_angle*robodk.pi/180) * robodk.sin(tilt_angle*robodk.pi/180)
+        for i, tilt_angle in enumerate(auto_scan_tilt_angles):
+            for swing_angle in auto_scan_planer_swing_angles[i]:
+                # Pose position and orientation
+                x = - r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.cos(swing_angle*robodk.pi/180)
+                y = r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.sin(swing_angle*robodk.pi/180)
+                z = r * robodk.sin(tilt_angle*robodk.pi/180)
                 pose_offset_from_ref = robodk.Offset(self.ref_frame, x, y, z)
-                print(pose_offset_from_ref)
-                # TODO: Working on camera orientation
-                self.robot.setPose(pose_offset_from_ref*robodk.rotz((90-swing_angle)*robodk.pi/180))
-                self.rdk.AddTarget(str(self.pose_counter))
-                self.pose_counter += 1
+                pose_offset_from_ref = pose_offset_from_ref * robodk.rotz(-(swing_angle+90)*robodk.pi/180) * robodk.rotx(-(tilt_angle+90)*robodk.pi/180)
+                self.robot.setPose(pose_offset_from_ref)
+                # Add new target
+                target = self.rdk.AddTarget(str(pose_counter))
+                target.setAsJointTarget()
+                target_list.append(target)
+                pose_counter += 1
 
         return target_list
 
+    def connect_robot(self):
+        # Update connection parameters if required:
+        # robot.setConnectionParams('192.168.2.35',30000,'/', 'anonymous','')
+        
+        # Connect to the robot using default IP
+        success = self.robot.Connect() # Try to connect once
+        #success robot.ConnectSafe() # Try to connect multiple times
+        status, status_msg = self.robot.ConnectedState()
+        if status != ROBOTCOM_READY:
+            # Stop if the connection did not succeed
+            print(status_msg)
+            raise Exception("Failed to connect: " + status_msg)
+        
+        # This will set to run the API programs on the robot and the simulator (online programming)
+        self.rdk.setRunMode(RUNMODE_RUN_ROBOT)
+        # Note: This is set automatically when we Connect() to the robot through the API
+
+        self.robot.setSpeedJoints(100)
+
+        return success
+
+    def save_robot_pose(self, pose_counter):
+        # save the robot's current pose
+        robot_pose = self.robot.Pose()
+        f_name = 'frame-%06d.pose.txt'%pose_counter
+        robot_pose.tr().SaveMat(f_name, separator=' ')
+        shutil.move(os.path.join(os.getcwd(), f_name), os.path.join(self.data_directory, f_name))
+        print('robot pose: ' + str(pose_counter))
+
     def run_tsdf(self):
         vol_bnds = np.zeros((3,2))
-        vol_bnds[:,0] = self.vol_bottom_center_wrt_robot_base - np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
+        vol_bnds[:,0] = self.vol_bottom_center_wrt_robot_base - np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, 0])
         vol_bnds[:,1] = self.vol_bottom_center_wrt_robot_base + np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
 
         # ======================================================================================================== #
@@ -205,7 +242,7 @@ class MainWidget(Qt.QWidget):
         n_imgs = len(glob.glob1(self.data_directory, "*.jpg"))
 
         # Load camera intrinsics
-        calib_file = os.path.join(self.data_directory ,'camera_params.yaml')
+        calib_file = os.path.join(self.data_directory, '../camera_params.yaml')
         calib_file = cv2.FileStorage(calib_file, cv2.FILE_STORAGE_READ)
         cam_intr = calib_file.getNode("intrinsic").mat()
 
