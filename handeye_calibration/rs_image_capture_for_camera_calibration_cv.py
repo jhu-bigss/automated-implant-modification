@@ -23,7 +23,7 @@ def create_image_directory():
 pipeline = rs.pipeline()
 config = rs.config()
 config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
-config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 60)
+config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
 
 # Start streaming
 pipeline.start(config)
@@ -53,8 +53,8 @@ try:
         if pressedKey == 27:
             break
         elif pressedKey == 32:
-            cv2.imwrite(os.path.join(image_dir, str(image_counter) + '.png'), color_image)
-            print('Image caputured - ' + os.path.join(image_dir, str(image_counter) + '.png'))
+            cv2.imwrite(os.path.join(image_dir, str(image_counter) + '.jpg'), color_image)
+            print('Image caputured - ' + os.path.join(image_dir, str(image_counter) + '.jpg'))
 
             image_counter+=1
 finally:

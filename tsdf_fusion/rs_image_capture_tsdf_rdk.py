@@ -18,9 +18,8 @@ data_foler = 'data/'
 
 reference_frame_wrt_robot_base = [772, -8, 410]
 auto_scan_camera_to_object_distance = 400
-auto_scan_tilt_angles = [110, 80, 60]
-auto_scan_planer_swing_angles = [[ 0],
-                                 [-45, 0, 45],
+auto_scan_tilt_angles = [80, 60]
+auto_scan_planer_swing_angles = [[-45, 0, 45],
                                  [-50, -30, -15, 0, 15, 30, 50]]
 
 class MainWidget(Qt.QWidget):
