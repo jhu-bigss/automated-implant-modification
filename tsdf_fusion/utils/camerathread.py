@@ -56,10 +56,7 @@ class CameraThread(QtCore.QThread):
 
                 # Get aligned depth frames
                 depth_frame = aligned_frames.get_depth_frame()
-
-                # depth_frame = frames.get_depth_frame()
                 color_frame = frames.get_color_frame()
-                # depth_frame = frames.get_depth_frame()
                 if not depth_frame or not color_frame:
                     continue
 
