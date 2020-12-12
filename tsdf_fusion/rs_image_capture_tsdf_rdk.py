@@ -11,7 +11,7 @@ from PyQt5 import Qt, QtCore
 from robolink import *
 from robodk import robodk
 
-from utils.camerathread import CameraThread
+from utils.camerathread import CameraRealsense, CameraPrimesense
 from utils import fusion
 
 data_foler = 'data/'
@@ -34,7 +34,9 @@ class MainWidget(Qt.QWidget):
 
         # create a label to display camera image
         self.cv_label = Qt.QLabel()
-        cv_thread = CameraThread(self)
+        # Choose RealSense or Primesense camera
+        cv_thread = CameraRealsense(self, 640, 480)
+        # cv_thread = CameraPrimesense(self)
         cv_thread.change_pixmap.connect(self.set_image)
         cv_thread.start()
 
@@ -173,7 +175,7 @@ class MainWidget(Qt.QWidget):
         else:
             # Manual mode
             self.image_captured.emit(self.data_directory) # call the opencv thread to save image to the given directory
-            self.save_robot_pose(self.save_robot_pose)
+            self.save_robot_pose(self.pose_counter)
             self.pose_counter += 1
 
     def generate_automatic_poses(self):
