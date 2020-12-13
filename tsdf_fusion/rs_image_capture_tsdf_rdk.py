@@ -8,29 +8,26 @@ import cv2
 
 from PyQt5 import Qt, QtCore
 
-from robolink import *
-from robodk import robodk
-
-from utils.camerathread import CameraRealsense, CameraPrimesense
+from utils.camerathread import CameraRealsense
+from utils.rdkthread import RoboDK
 from utils import fusion
 
 data_foler = 'data/'
 
-reference_frame_wrt_robot_base = [772, -8, 415]
-auto_scan_camera_to_object_distance = 600
-auto_scan_tilt_angles = [80, 60]
-auto_scan_planer_swing_angles = [[-45, 0, 45],
-                                 [-50, -30, -15, 0, 15, 30, 50]]
-
 class MainWidget(Qt.QWidget):
-    rdk = Robolink()
+
     view_mode_changed = QtCore.pyqtSignal(bool)
-    image_captured = QtCore.pyqtSignal(str)
+    set_save_dir = QtCore.pyqtSignal(str)
+    image_capture = QtCore.pyqtSignal()
+    pose_capture = QtCore.pyqtSignal()
     window_closed = QtCore.pyqtSignal()
 
     def __init__(self, name=None, parent=None, show=True):
         super(MainWidget, self).__init__()
         self.setWindowTitle(name)
+
+        # create default save folder
+        self.data_directory = self.create_data_directory(os.path.dirname(os.path.realpath(__file__)))
 
         # create a label to display camera image
         self.cv_label = Qt.QLabel()
@@ -40,8 +37,10 @@ class MainWidget(Qt.QWidget):
         cv_thread.change_pixmap.connect(self.set_Qimage)
         cv_thread.start()
 
-        # create default save folder
-        self.data_directory = self.create_data_directory(os.path.dirname(os.path.realpath(__file__)))
+        # Robot Communication through RoboDK
+        self.rdk = RoboDK(self)
+        # Run tsdf immediately after capturing all the data in automatic mode
+        self.rdk.automatic_capture_complete.connect(self.run_tsdf)
 
         self.open_dir_button = Qt.QPushButton("Save Folder")
         self.toggle_view_mode_button = Qt.QPushButton("View Mode")
@@ -53,7 +52,6 @@ class MainWidget(Qt.QWidget):
         self.capture_button = Qt.QPushButton("Capture")
 
         # Parameters inputs for TSDF
-        self.vol_bottom_center_wrt_robot_base = np.array(reference_frame_wrt_robot_base)
         self.vol_width_dspinbox = Qt.QDoubleSpinBox()
         self.vol_width_dspinbox.setMaximum(1000)
         self.vol_width_dspinbox.setValue(300)
@@ -93,14 +91,6 @@ class MainWidget(Qt.QWidget):
         vlayout.setContentsMargins(0,0,0,0)
         self.setLayout(vlayout)
 
-        # RoboDK stuff
-        self.robot = self.rdk.Item('', ITEM_TYPE_ROBOT)
-        self.ref_frame = self.rdk.Item('Reference', ITEM_TYPE_FRAME)
-        if not self.ref_frame.Valid():
-            self.ref_frame = self.rdk.AddFrame('Reference')
-            self.ref_frame.setPose(robodk.transl(*reference_frame_wrt_robot_base))
-        self.pose_counter = 0
-
         if show:
             self.show()
 
@@ -135,6 +125,7 @@ class MainWidget(Qt.QWidget):
     def open_data_directory(self):
         dir_open = Qt.QFileDialog.getExistingDirectory(self, 'Select Save Folder', os.path.dirname(os.path.realpath(__file__)))
         self.data_directory = self.create_data_directory(dir_open)
+        self.set_save_dir.emit(self.data_directory)
 
     def change_view_mode(self):
         if self.toggle_view_mode_button.isChecked():
@@ -161,78 +152,16 @@ class MainWidget(Qt.QWidget):
     def capture_event(self):
         if self.toggle_tsdf_mode_button.isChecked():
             # Automatic mode
-            targets = self.generate_automatic_poses()
-            if self.connect_robot():
-                for i, target in enumerate(targets):
-                    self.robot.MoveJ(target)
-                    self.robot.WaitMove(10) # in seconds
-                    self.image_captured.emit(self.data_directory)
-                    self.save_robot_pose(i)
-                self.robot.Disconnect()
-            
-            self.run_tsdf()
-
+            self.rdk.start()
         else:
             # Manual mode
-            self.image_captured.emit(self.data_directory) # call the opencv thread to save image to the given directory
-            self.save_robot_pose(self.pose_counter)
-            self.pose_counter += 1
-
-    def generate_automatic_poses(self):
-        target_list = []
-        r = auto_scan_camera_to_object_distance
-        pose_counter = 0
-
-        for i, tilt_angle in enumerate(auto_scan_tilt_angles):
-            for swing_angle in auto_scan_planer_swing_angles[i]:
-                # Pose position and orientation
-                x = - r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.cos(swing_angle*robodk.pi/180)
-                y = r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.sin(swing_angle*robodk.pi/180)
-                z = r * robodk.sin(tilt_angle*robodk.pi/180)
-                pose_offset_from_ref = robodk.Offset(self.ref_frame, x, y, z)
-                pose_offset_from_ref = pose_offset_from_ref * robodk.rotz(-(swing_angle+90)*robodk.pi/180) * robodk.rotx(-(tilt_angle+90)*robodk.pi/180)
-                self.robot.setPose(pose_offset_from_ref)
-                # Add new target
-                target = self.rdk.AddTarget(str(pose_counter))
-                target.setAsJointTarget()
-                target_list.append(target)
-                pose_counter += 1
-
-        return target_list
-
-    def connect_robot(self):
-        # Update connection parameters if required:
-        # robot.setConnectionParams('192.168.2.35',30000,'/', 'anonymous','')
-        
-        # Connect to the robot using default IP
-        success = self.robot.Connect() # Try to connect once
-        #success robot.ConnectSafe() # Try to connect multiple times
-        status, status_msg = self.robot.ConnectedState()
-        if status != ROBOTCOM_READY:
-            # Stop if the connection did not succeed
-            print(status_msg)
-            raise Exception("Failed to connect: " + status_msg)
-        
-        # This will set to run the API programs on the robot and the simulator (online programming)
-        self.rdk.setRunMode(RUNMODE_RUN_ROBOT)
-        # Note: This is set automatically when we Connect() to the robot through the API
-
-        self.robot.setSpeedJoints(100)
-
-        return success
-
-    def save_robot_pose(self, pose_counter):
-        # save the robot's current pose
-        robot_pose = self.robot.Pose()
-        f_name = 'frame-%06d.pose.txt'%pose_counter
-        robot_pose.tr().SaveMat(f_name, separator=' ')
-        shutil.move(os.path.join(os.getcwd(), f_name), os.path.join(self.data_directory, f_name))
-        print('robot pose: ' + str(pose_counter))
+            self.image_capture.emit()
+            self.pose_capture.emit()
 
     def run_tsdf(self):
         vol_bnds = np.zeros((3,2))
-        vol_bnds[:,0] = self.vol_bottom_center_wrt_robot_base - np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, 0])
-        vol_bnds[:,1] = self.vol_bottom_center_wrt_robot_base + np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
+        vol_bnds[:,0] = np.array(self.rdk.get_ref_frame()) - np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, 0])
+        vol_bnds[:,1] = np.array(self.rdk.get_ref_frame()) + np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
 
         # ======================================================================================================== #
         # Integrate

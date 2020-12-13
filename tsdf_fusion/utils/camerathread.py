@@ -32,7 +32,7 @@ class CameraRealsense(QtCore.QThread):
         
         # start streaming
         profile = self.pipeline.start(config)
-        self.view_mode_bg_removed = False
+        self.view_mode_bg_removed = True
         self.running = True
         print("start realsense!")
 
@@ -46,9 +46,11 @@ class CameraRealsense(QtCore.QThread):
         self.align = rs.align(rs.stream.color) # align to color frame
 
         parent.view_mode_changed.connect(self.change_view_mode)
-        parent.image_captured.connect(self.save_image)
+        parent.set_save_dir.connect(self.set_save_dir)
+        parent.image_capture.connect(self.save_image)
         parent.window_closed.connect(self.stop)
 
+        self.save_dir = parent.data_directory
         self.image_counter = 0 # saving images
 
     def run(self):
@@ -105,9 +107,13 @@ class CameraRealsense(QtCore.QThread):
         self.view_mode_bg_removed = view_mode
 
     @Qt.pyqtSlot(str)
-    def save_image(self, save_dir):
-        depth_image_path = os.path.join(save_dir, "frame-%06d.depth.png"%(self.image_counter))
-        color_image_path = os.path.join(save_dir, "frame-%06d.color.jpg"%(self.image_counter))
+    def set_save_dir(self, dir):
+        self.save_dir = dir
+
+    @Qt.pyqtSlot()
+    def save_image(self):
+        depth_image_path = os.path.join(self.save_dir, "frame-%06d.depth.png"%(self.image_counter))
+        color_image_path = os.path.join(self.save_dir, "frame-%06d.color.jpg"%(self.image_counter))
         cv2.imwrite(depth_image_path, self.depth_image)
         cv2.imwrite(color_image_path, self.color_image)
         print('save image: ' + str(self.image_counter))
@@ -163,7 +169,7 @@ class CameraPrimesense(QtCore.QThread):
         dev.set_image_registration_mode(openni2.IMAGE_REGISTRATION_DEPTH_TO_COLOR)
 
         parent.view_mode_changed.connect(self.change_view_mode)
-        parent.image_captured.connect(self.save_image)
+        parent.image_capture.connect(self.save_image)
         parent.window_closed.connect(self.stop)
 
         self.view_mode_bg_removed = False
