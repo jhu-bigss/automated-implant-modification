@@ -15,7 +15,7 @@ import numpy as np
 # Linux
 dist = os.path.expanduser("~/OpenNI-Linux-x64-2.2/Redist")
 
-clipping_distance_in_meters = 1
+clipping_distance = 1000 # mm
 
 class CameraRealsense(QtCore.QThread):
 
@@ -38,12 +38,9 @@ class CameraRealsense(QtCore.QThread):
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
-        depth_scale = depth_sensor.get_depth_scale()
-        # print("Depth Scale is: " , depth_scale)
+        self.depth_scale = depth_sensor.get_depth_scale()
+        # print("Depth Scale is: " , self.depth_scale)
 
-        # We will be removing the background of objects more than clipping_distance_in_meters meters away
-        self.clipping_distance = clipping_distance_in_meters / depth_scale
-        
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
         self.align = rs.align(rs.stream.color) # align to color frame
@@ -69,14 +66,15 @@ class CameraRealsense(QtCore.QThread):
                     continue
 
                 # convert image to numpy arr
-                self.depth_image = np.asanyarray(depth_frame.get_data())
+                self.depth_image = (np.asanyarray(depth_frame.get_data()) * self.depth_scale * 1000).astype(int)
                 self.color_image = np.asanyarray(color_frame.get_data())
 
                 if self.view_mode_bg_removed:
                     # Remove background - Set pixels further than clipping_distance to grey
+                    # We will be removing the background of objects more than clipping_distance milimeters away
                     grey_color = 153
                     depth_image_3d = np.dstack((self.depth_image, self.depth_image, self.depth_image)) #depth image is 1 channel, color is 3 channels
-                    images = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= 0), grey_color, self.color_image)
+                    images = np.where((depth_image_3d > clipping_distance) | (depth_image_3d <= 0), grey_color, self.color_image)
                 else:
                     # depth image must be converted to 8-bit per pixel first
                     depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(self.depth_image, alpha=0.03), cv2.COLORMAP_JET)

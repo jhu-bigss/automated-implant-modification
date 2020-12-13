@@ -34,10 +34,10 @@ class MainWidget(Qt.QWidget):
 
         # create a label to display camera image
         self.cv_label = Qt.QLabel()
-        # Choose RealSense or Primesense camera
+        # Choose RealSense or Primesense camera; if use SR300, it requires 640x480
         cv_thread = CameraRealsense(self, 640, 480)
         # cv_thread = CameraPrimesense(self)
-        cv_thread.change_pixmap.connect(self.set_image)
+        cv_thread.change_pixmap.connect(self.set_Qimage)
         cv_thread.start()
 
         # create default save folder
@@ -117,7 +117,7 @@ class MainWidget(Qt.QWidget):
             event.ignore()
 
     @Qt.pyqtSlot(Qt.QImage)
-    def set_image(self, image):
+    def set_Qimage(self, image):
         self.cv_label.setPixmap(Qt.QPixmap.fromImage(image))
 
     # create a directory to save captured images and robot poses
