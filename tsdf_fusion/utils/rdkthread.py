@@ -54,6 +54,7 @@ class RoboDK(QtCore.QThread):
 
     def generate_automatic_poses(self):
         target_list = []
+        target_cnt = 1
         r = auto_scan_camera_to_object_distance
 
         for i, tilt_angle in enumerate(auto_scan_tilt_angles):
@@ -66,9 +67,10 @@ class RoboDK(QtCore.QThread):
                 pose_offset_from_ref = pose_offset_from_ref * robodk.rotz(-(swing_angle+90)*robodk.pi/180) * robodk.rotx(-(tilt_angle+90)*robodk.pi/180)
                 self.robot.setPose(pose_offset_from_ref)
                 # Add new target
-                target = self.rdk.AddTarget(str(self.pose_counter))
+                target = self.rdk.AddTarget(str(target_cnt))
                 target.setAsJointTarget()
                 target_list.append(target)
+                target_cnt += 1
 
         return target_list
 
