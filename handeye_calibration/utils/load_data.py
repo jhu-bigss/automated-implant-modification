@@ -3,6 +3,9 @@ import glob
 import cv2
 from utils import chessboard
 
+IMAGE_WIDTH = 640
+IMAGE_HEIGHT = 480
+
 def read_robot_pose_from_dir(path):
     # ---------- Load the robot poses ---------- #
     pose_txt_list = sorted(glob.glob(path + "*.txt"))
@@ -14,7 +17,7 @@ def read_robot_pose_from_dir(path):
 
     return robot_poses
 
-def read_chessboard_image_from_dir(path, img_width=1280, img_height=720, chessboard_width=7, chessboard_height=6, chessboard_square_size=30, calibrate_camera=False):
+def read_chessboard_image_from_dir(path, img_width=IMAGE_WIDTH, img_height=IMAGE_HEIGHT, chessboard_width=7, chessboard_height=6, chessboard_square_size=30, calibrate_camera=False):
     # --------- Load the world poses ------------ #
     image_list = sorted(glob.glob(path + "*.jpg"))
     images = [cv2.imread(file) for file in image_list]

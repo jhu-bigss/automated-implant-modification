@@ -36,7 +36,7 @@ class MainWidget(Qt.QWidget):
 
         # create a label to display camera image
         self.cv_label = Qt.QLabel()
-        cv_thread = CameraThread(self)
+        cv_thread = CameraThread(self, 640, 480)
         cv_thread.change_pixmap.connect(self.set_image)
         cv_thread.start()
         self.data_directory = self.create_data_directory(os.path.dirname(os.path.realpath(__file__)))

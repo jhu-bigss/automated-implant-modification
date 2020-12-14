@@ -36,7 +36,7 @@ pip install pycuda
 
 
 ## TO-DO
-- [ ] Port the toolpath generation code from izmar Github --> Improve toolpath generation
+- [ ] Smooth the output mesh/pointcloud to create a cleaner results 
 
 ## Reference
 - [Hand Eye Calibration](https://github.com/monroe-git/hand-eye)

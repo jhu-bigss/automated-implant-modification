@@ -6,11 +6,10 @@ from robolink import *
 from robodk import robodk
 
 # Scanning parameters:
-auto_scan_camera_to_object_distance = 400
-reference_frame_wrt_robot_base = [772, -8, 415]
-auto_scan_tilt_angles = [80, 60]
-auto_scan_planer_swing_angles = [[-45, 0, 45],
-                                 [-50, -30, -15, 0, 15, 30, 50]]
+auto_scan_camera_to_object_distance = 300
+reference_frame_wrt_robot_base = [772, -8, 420]
+auto_scan_tilt_angles = [80]
+auto_scan_planer_swing_angles = [[-30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30]]
 
 class RoboDK(QtCore.QThread):
 
@@ -49,7 +48,9 @@ class RoboDK(QtCore.QThread):
 
     def get_ref_frame(self):
         # return the translation part of the reference frame pose
-        xyz = self.ref_frame.Pose().list2()[-1].pop()
+        xyz = self.ref_frame.Pose().list2()[-1]
+        # pop out the last element since list2() gives a homogeneous point
+        xyz.pop()
         return xyz
 
     def generate_automatic_poses(self):
