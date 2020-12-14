@@ -11,13 +11,13 @@ class CameraThread(QtCore.QThread):
 
     change_pixmap = QtCore.pyqtSignal(Qt.QImage)
 
-    def __init__(self, parent=None, stream_type=rs.stream.color, width=1280, height=720, fps=30):
+    def __init__(self, parent=None, width=1280, height=720, fps=30):
         super().__init__()
         
         # Declare RealSense pipelineline 
         self.pipeline = rs.pipeline()
         config = rs.config()
-        config.enable_stream(stream_type, width, height, rs.format.bgr8, fps)
+        config.enable_stream(rs.stream.color, width, height, rs.format.bgr8, fps)
         
         # start streaming
         self.pipeline.start(config)
