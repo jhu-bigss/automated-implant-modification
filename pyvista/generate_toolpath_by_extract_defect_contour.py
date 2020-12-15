@@ -2,6 +2,7 @@ import sys, os, vtk
 
 import pyvista as pv
 import numpy as np
+import trimesh
 
 from PyQt5 import Qt, QtCore, uic
 from pyvistaqt import QtInteractor
@@ -82,6 +83,7 @@ class MainWindow(Qt.QMainWindow):
         self.load_contour_csv(self.fname)
         fname = "../data/3-1 Defect_registered.stl"
         self.mesh_defect = pv.read(fname)
+        self.mesh_defect_trimesh = trimesh.load(fname)
 
         if show:
             self.show()
@@ -446,19 +448,46 @@ class MainWindow(Qt.QMainWindow):
         self.plotter.add_arrows(self.toolpath[:,:3], self.toolpath[:,3:], mag=3, color='green', name='TCP_axis_pos')
 
         # 4. adjust the vectors to fit the defect wall (debug here: use self.mesh_defect)
-        # a) find tool_vector_start and tool_vector_end defined in GUI
-        # b) determine the direction for ray-casting, by checking if the initial vector is inside/outside the mesh
-        # c) perform ray-casting and define the new vector tool
+            # a) find tool_vector_start and tool_vector_end defined in GUI
+            # b) determine the direction for ray-casting, by checking if the initial vector is inside/outside the mesh
+            # c) perform ray-casting and define the new vector tool
         points_vector_tool_start = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_start.value()
         points_vector_tool_end = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_end.value()
-        # if self.mesh_defect is not None:
-        #     closest_pts = []
-        #     for point in points_ends:
-        #         closest_pt_id = self.mesh_implant.find_closest_point(point)
-        #         closest_pt = self.mesh_implant.points[closest_pt_id]
-        #         closest_pts.append(closest_pt)
-        #     closest_pts = np.array(closest_pts)
-        #     self.plotter.add_points(closest_pts, style='points', color='green', point_size=20.0, name='closest')
+        self.plotter.add_points(points_vector_tool_start, style='points', color='Red', point_size=20.0, name='start')
+        self.plotter.add_points(points_vector_tool_end, style='points', color='Green', point_size=20.0, name='ends')
+
+        if self.mesh_defect_trimesh is not None:
+            locations_start, idr_start, idt_start = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_start, -vectors_along_plane_tangential, multiple_hits=False)
+            locations_end, idr_end, idt_end = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_end, -vectors_along_plane_tangential, multiple_hits=False)
+            print(idr_start)
+            print(np.argsort(idr_start))
+            if len(locations_start) > 0:
+                self.plotter.add_points(locations_start, style='points', color='black', point_size=20.0, name='ray_casted_start')
+            if len(locations_end) > 0:
+                self.plotter.add_points(locations_end, style='points', color='black', point_size=20.0, name='ray_casted_end')
+
+            # check if number of intersections match:
+            if len(locations_start) == len(locations_end) and len(locations_start) > 0:
+                vectors_tool = locations_end[np.argsort(idr_end)] - locations_start[np.argsort(idr_start)]
+                lengths = np.linalg.norm(vectors_tool, axis = 1)
+                lengths = lengths.reshape((-1,1))
+                lengths = np.repeat(lengths, 3, axis=1)
+                print(vectors_tool.shape)
+                print(lengths.shape)
+                vectors_tool = vectors_tool / lengths
+                self.plotter.add_arrows(self.toolpath[:,:3], vectors_tool, mag=3, color='blue', name='TCP_axis_final')
+            else:
+                print("shape does not match:")
+                print(len(locations_start))
+                print(len(locations_end))
+
+            # # closest points
+            # closest_pts = []
+            # for point in points_ends:
+            #     closest_pt_id = self.mesh_implant.find_closest_point(point)
+            #     closest_pt = self.mesh_implant.points[closest_pt_id]
+            #     closest_pts.append(closest_pt)
+            # closest_pts = np.array(closest_pts)
 
         # ## point part ## - to consider tool diameter compensation
         # # 1. distribute the tooltip offset displacement along tangential
