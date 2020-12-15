@@ -24,6 +24,14 @@ class CameraRealsense(QtCore.QThread):
     def __init__(self, parent=None, width=1280, height=720, fps=30):
         super().__init__()
         
+        # Check if any availiable device is connected
+        realsense_ctx = rs.context()
+        connected_devices = []
+        if len(realsense_ctx.devices) == 0:
+            print("No RealSense device is detected. Therefore, no camera thread started.")
+            self.running = False
+            return
+
         # Declare RealSense pipelineline 
         self.pipeline = rs.pipeline()
         config = rs.config()
@@ -48,7 +56,7 @@ class CameraRealsense(QtCore.QThread):
         parent.view_mode_changed.connect(self.change_view_mode)
         parent.set_save_dir.connect(self.set_save_dir)
         parent.image_capture.connect(self.save_image)
-        parent.window_closed.connect(self.stop)
+        parent.close_window.connect(self.stop)
 
         self.save_dir = parent.data_directory
         self.image_counter = 0 # saving images
@@ -170,7 +178,7 @@ class CameraPrimesense(QtCore.QThread):
 
         parent.view_mode_changed.connect(self.change_view_mode)
         parent.image_capture.connect(self.save_image)
-        parent.window_closed.connect(self.stop)
+        parent.close_window.connect(self.stop)
 
         self.view_mode_bg_removed = False
         self.image_counter = 0 # saving images

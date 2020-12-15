@@ -20,7 +20,7 @@ class MainWidget(Qt.QWidget):
     set_save_dir = QtCore.pyqtSignal(str)
     image_capture = QtCore.pyqtSignal()
     pose_capture = QtCore.pyqtSignal()
-    window_closed = QtCore.pyqtSignal()
+    close_window = QtCore.pyqtSignal()
 
     def __init__(self, name=None, parent=None, show=True):
         super(MainWidget, self).__init__()
@@ -99,10 +99,9 @@ class MainWidget(Qt.QWidget):
                 Qt.QMessageBox.Yes | Qt.QMessageBox.No, Qt.QMessageBox.No)
 
         if reply == Qt.QMessageBox.Yes:
-            # signal camera thread to stop camera
-            self.window_closed.emit()
+            # signal camera thread to stop camera and robodk
+            self.close_window.emit()
             event.accept()
-            print('Window closed')
         else:
             event.ignore()
 
@@ -195,15 +194,18 @@ class MainWidget(Qt.QWidget):
         fps = n_imgs / (time.time() - t0_elapse)
         print("Average FPS: {:.2f}".format(fps))
 
-        # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
-        print("Saving mesh to mesh.ply...")
-        verts, faces, norms, colors = tsdf_vol.get_mesh()
-        fusion.meshwrite("mesh.ply", verts, faces, norms, colors)
+        print(type(tsdf_vol))
+        print(tsdf_vol)
 
-        # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
-        print("Saving point cloud to pc.ply...")
-        point_cloud = tsdf_vol.get_point_cloud()
-        fusion.pcwrite("pc.ply", point_cloud)
+        # # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
+        # print("Saving mesh to mesh.ply...")
+        # verts, faces, norms, colors = tsdf_vol.get_mesh()
+        # fusion.meshwrite("mesh.ply", verts, faces, norms, colors)
+
+        # # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
+        # print("Saving point cloud to pc.ply...")
+        # point_cloud = tsdf_vol.get_point_cloud()
+        # fusion.pcwrite("pc.ply", point_cloud)
 
         print("=====>Done<=====")
 

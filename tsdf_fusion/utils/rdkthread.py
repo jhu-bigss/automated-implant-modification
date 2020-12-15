@@ -16,19 +16,32 @@ class RoboDK(QtCore.QThread):
     rdk = Robolink()
     automatic_capture_complete = QtCore.pyqtSignal()
 
+    ref_frame = robodk.transl(*reference_frame_wrt_robot_base)
+
     def __init__(self, parent=None):
         super().__init__()
 
+        # check if RoboDK application is running
+        if not self.rdk.Connect():
+            print("Warning: RoboDK is not running.")
+            self.running = False
+            return
+        else:
+            self.running = True
+
         self.robot = self.rdk.Item('', ITEM_TYPE_ROBOT)
 
-        self.ref_frame = self.rdk.Item('Reference', ITEM_TYPE_FRAME)
-        if not self.ref_frame.Valid():
+        # Check if reference frame exists, if yes, use it; if not, add default value
+        ref_frame_query = self.rdk.Item('Reference', ITEM_TYPE_FRAME)
+        if ref_frame_query.Valid():
+            self.ref_frame = ref_frame_query
+        else:
             self.ref_frame = self.rdk.AddFrame('Reference')
             self.ref_frame.setPose(robodk.transl(*reference_frame_wrt_robot_base))
 
         parent.set_save_dir.connect(self.set_save_dir)
         parent.pose_capture.connect(self.save_robot_pose)
-        parent.window_closed.connect(self.quit)
+        parent.close_window.connect(self.quit)
 
         self.save_dir = parent.data_directory
         self.image_capture = parent.image_capture
@@ -48,9 +61,10 @@ class RoboDK(QtCore.QThread):
 
     def get_ref_frame(self):
         # return the translation part of the reference frame pose
-        xyz = self.ref_frame.Pose().list2()[-1]
-        # pop out the last element since list2() gives a homogeneous point
-        xyz.pop()
+        if self.running:
+            xyz = self.ref_frame.Pose().Pos()
+        else:
+            xyz = self.ref_frame.Pos()
         return xyz
 
     def generate_automatic_poses(self):
