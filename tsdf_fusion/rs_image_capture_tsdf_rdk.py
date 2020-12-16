@@ -54,12 +54,12 @@ class MainWidget(Qt.QWidget):
         # Parameters inputs for TSDF
         self.vol_width_dspinbox = Qt.QDoubleSpinBox()
         self.vol_width_dspinbox.setMaximum(1000)
-        self.vol_width_dspinbox.setValue(300)
+        self.vol_width_dspinbox.setValue(250)
         self.vol_height_dspinbox = Qt.QDoubleSpinBox()
-        self.vol_height_dspinbox.setMaximum(200)
+        self.vol_height_dspinbox.setMaximum(250)
         self.vol_height_dspinbox.setValue(50)
         self.vol_marching_cube_size = Qt.QDoubleSpinBox()
-        self.vol_marching_cube_size.setSingleStep(0.1)
+        self.vol_marching_cube_size.setSingleStep(0.5)
         self.vol_marching_cube_size.setValue(1)
         self.run_tsdf_button = Qt.QPushButton("Run TSDF")
 
@@ -194,23 +194,20 @@ class MainWidget(Qt.QWidget):
         fps = n_imgs / (time.time() - t0_elapse)
         print("Average FPS: {:.2f}".format(fps))
 
-        print(type(tsdf_vol))
-        print(tsdf_vol)
+        # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
+        print("Saving mesh to mesh.ply...")
+        verts, faces, norms, colors = tsdf_vol.get_mesh()
+        fusion.meshwrite("mesh.ply", verts, faces, norms, colors)
 
-        # # Get mesh from voxel volume and save to disk (can be viewed with Meshlab)
-        # print("Saving mesh to mesh.ply...")
-        # verts, faces, norms, colors = tsdf_vol.get_mesh()
-        # fusion.meshwrite("mesh.ply", verts, faces, norms, colors)
-
-        # # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
-        # print("Saving point cloud to pc.ply...")
-        # point_cloud = tsdf_vol.get_point_cloud()
-        # fusion.pcwrite("pc.ply", point_cloud)
+        # Get point cloud from voxel volume and save to disk (can be viewed with Meshlab)
+        print("Saving point cloud to pc.ply...")
+        point_cloud = tsdf_vol.get_point_cloud()
+        fusion.pcwrite("pc.ply", point_cloud)
 
         print("=====>Done<=====")
 
 if __name__ == '__main__':
     app = Qt.QApplication(sys.argv)
-    window_title="OpenCV Hand-eye Calibration"
+    window_title="Robotic TSDF Fusion"
     window = MainWidget(window_title)
     sys.exit(app.exec_())
