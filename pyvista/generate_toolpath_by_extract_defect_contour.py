@@ -1,4 +1,5 @@
 import sys, os, vtk
+from functools import reduce
 
 import pyvista as pv
 import numpy as np
@@ -48,6 +49,7 @@ class MainWindow(Qt.QMainWindow):
         self.pushButton_generate_toolpath.clicked.connect(self.generate_toolpath)
         self.pushButton_save_contour.clicked.connect(self.save_contour_csv)
         self.pushButton_load_contour.clicked.connect(self.load_contour_csv_event)
+        self.pushButton_load_trimesh.clicked.connect(self.load_trimesh)
         self.pushButton_save_toolpath.clicked.connect(self.save_toolpath)
         
         # statusbar setting
@@ -79,11 +81,11 @@ class MainWindow(Qt.QMainWindow):
         # self.load_mesh()
 
         # # debug: load contour directly
-        self.fname = "../data/test.csv"
-        self.load_contour_csv(self.fname)
-        fname = "../data/3-1 Defect_registered.stl"
-        self.mesh_defect = pv.read(fname)
-        self.mesh_defect_trimesh = trimesh.load(fname)
+        # self.fname = "../data/test.csv"
+        # self.load_contour_csv(self.fname)
+        # fname = "../data/3-1 Defect_registered.stl"
+        # self.mesh_defect = pv.read(fname)
+        # self.mesh_defect_trimesh = trimesh.load(fname)
 
         if show:
             self.show()
@@ -122,12 +124,20 @@ class MainWindow(Qt.QMainWindow):
         else:
             e.ignore()
 
+    def load_trimesh(self):
+        self.fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open file','',"(*.stl) ;; (*.ply)")
+        if self.fname != "":
+            self.mesh_defect_trimesh = trimesh.load(self.fname)
+            self.mesh = pv.read(self.fname)
+
     def load_mesh_event(self):
         """
         Open a mesh file
         """
         self.fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open file','',"(*.ply) ;; (*.stl)")
-        self.load_mesh()
+        if self.fname != "":
+            self.load_mesh()
+            self.mesh_defect_trimesh = trimesh.load(self.fname)
 
     def load_mesh(self):
         self.mesh = pv.read(self.fname)
@@ -153,22 +163,23 @@ class MainWindow(Qt.QMainWindow):
             self.statusbar.addWidget(self.slider_opacity_defect)
         else:
             fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open file', '',"(*.stl) ;; (*.ply)")
-        self.mesh_implant = pv.read(fname)
-        
-        label_visibility = Qt.QLabel(" Show ")
-        self.checkbox_show_implant = Qt.QCheckBox(fname.split('/')[-1])
-        self.checkbox_show_implant.stateChanged.connect(self.show_impant)
-        self.statusbar.removeWidget(self.pushButton_implant_mesh)
-        self.statusbar.removeWidget(self.label_no_implant_mesh_loaded)
-        self.statusbar.addWidget(label_visibility)
-        self.statusbar.addWidget(self.checkbox_show_implant)
-        
-        self.slider_opacity_implant = Qt.QSlider ()
-        self.slider_opacity_implant.setMaximum(100)
-        self.slider_opacity_implant.setMinimum(0)
-        self.slider_opacity_implant.setValue(100)
-        self.slider_opacity_implant.valueChanged.connect(self.show_impant)
-        self.statusbar.addWidget(self.slider_opacity_implant)
+        if fname != "":
+            self.mesh_implant = pv.read(fname)
+            
+            label_visibility = Qt.QLabel(" Show ")
+            self.checkbox_show_implant = Qt.QCheckBox(fname.split('/')[-1])
+            self.checkbox_show_implant.stateChanged.connect(self.show_impant)
+            self.statusbar.removeWidget(self.pushButton_implant_mesh)
+            self.statusbar.removeWidget(self.label_no_implant_mesh_loaded)
+            self.statusbar.addWidget(label_visibility)
+            self.statusbar.addWidget(self.checkbox_show_implant)
+            
+            self.slider_opacity_implant = Qt.QSlider ()
+            self.slider_opacity_implant.setMaximum(100)
+            self.slider_opacity_implant.setMinimum(0)
+            self.slider_opacity_implant.setValue(100)
+            self.slider_opacity_implant.valueChanged.connect(self.show_impant)
+            self.statusbar.addWidget(self.slider_opacity_implant)
         
     def load_contour_csv_event(self):
         """
@@ -178,7 +189,8 @@ class MainWindow(Qt.QMainWindow):
         if self.fname is not None:
             file_dir = self.fname.strip(self.fname.split('/')[-1])
         fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open CSV file', file_dir,"(*.csv) ;; (*.txt)")
-        self.load_contour_csv(fname)
+        if fname != '':
+            self.load_contour_csv(fname)
         
     def load_contour_csv(self, filename):
         self.spline_curve_fit = pv.PolyData(np.genfromtxt(filename)[:,:3])
@@ -412,6 +424,7 @@ class MainWindow(Qt.QMainWindow):
                     widget.SetHandlePosition(i, *handle_position)
 
     def generate_toolpath(self):
+        print("Generating toolpath")
         # d is the diameter of the cutter tool; alpha is the tool tilt-in angle
         d = self.doubleSpinBox_tool_diameter.value()
         r = d/2
@@ -440,50 +453,92 @@ class MainWindow(Qt.QMainWindow):
 
         # visualize the result
         points_tool = self.spline_curve_fit.points
-        # points_ends = points_tool + vectors_tool*3
-        # self.plotter.add_points(points_ends, style='points', color='Red', point_size=20.0, name='ends')
+        # points_seconds = points_tool + vectors_tool*3
+        # self.plotter.add_points(points_seconds, style='points', color='Red', point_size=20.0, name='seconds')
         self.toolpath = np.column_stack((points_tool, vectors_tool))
         # self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
         self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis_neg') # the one used before
         self.plotter.add_arrows(self.toolpath[:,:3], self.toolpath[:,3:], mag=3, color='green', name='TCP_axis_pos')
 
         # 4. adjust the vectors to fit the defect wall (debug here: use self.mesh_defect)
-            # a) find tool_vector_start and tool_vector_end defined in GUI
+            # a) find tool_vector_first and tool_vector_second defined in GUI
             # b) determine the direction for ray-casting, by checking if the initial vector is inside/outside the mesh
-            # c) perform ray-casting and define the new vector tool
-        points_vector_tool_start = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_start.value()
-        points_vector_tool_end = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_end.value()
-        self.plotter.add_points(points_vector_tool_start, style='points', color='Red', point_size=20.0, name='start')
-        self.plotter.add_points(points_vector_tool_end, style='points', color='Green', point_size=20.0, name='ends')
+            # c) perform ray-casting and define the new vector tool (NOTE: take care of the cases without interseciton, ex: bad scan)
+        points_vector_tool_first = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_first.value()
+        points_vector_tool_second = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_second.value()
+        # self.plotter.add_points(points_vector_tool_first, style='points', color='Red', point_size=20.0, name='first')
+        # self.plotter.add_points(points_vector_tool_second, style='points', color='Green', point_size=20.0, name='seconds')
 
         if self.mesh_defect_trimesh is not None:
-            locations_start, idr_start, idt_start = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_start, -vectors_along_plane_tangential, multiple_hits=False)
-            locations_end, idr_end, idt_end = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_end, -vectors_along_plane_tangential, multiple_hits=False)
-            print(idr_start)
-            print(np.argsort(idr_start))
-            if len(locations_start) > 0:
-                self.plotter.add_points(locations_start, style='points', color='black', point_size=20.0, name='ray_casted_start')
-            if len(locations_end) > 0:
-                self.plotter.add_points(locations_end, style='points', color='black', point_size=20.0, name='ray_casted_end')
+            # NOTE: the returned idr is the array of ray indices for intersects_location()
+            locations_first, idr_first, idt_first = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_first, -vectors_along_plane_tangential, multiple_hits=False)
+            locations_second, idr_second, idt_second = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_second, -vectors_along_plane_tangential, multiple_hits=False)
+
+            # if len(locations_first) > 0:
+            #     self.plotter.add_points(locations_first, style='points', color='black', point_size=20.0, name='ray_casted_first')
+            # if len(locations_second) > 0:
+            #     self.plotter.add_points(locations_second, style='points', color='black', point_size=20.0, name='ray_casted_second')
+
+            # Update vectors_new with valid vectors from ray-casting and get indices for invalid ones
+            invalid_ids = None
+
+            if len(locations_first) < len(vectors_tool)//2 or len(locations_second) < len(vectors_tool)//2:
+                print("Ray casting fails! Num of Intersection is less than half of the number of the vectors.")
+                return
 
             # check if number of intersections match:
-            if len(locations_start) == len(locations_end) and len(locations_start) > 0:
-                vectors_tool = locations_end[np.argsort(idr_end)] - locations_start[np.argsort(idr_start)]
-                lengths = np.linalg.norm(vectors_tool, axis = 1)
-                lengths = lengths.reshape((-1,1))
-                lengths = np.repeat(lengths, 3, axis=1)
-                print(vectors_tool.shape)
-                print(lengths.shape)
-                vectors_tool = vectors_tool / lengths
-                self.plotter.add_arrows(self.toolpath[:,:3], vectors_tool, mag=3, color='blue', name='TCP_axis_final')
+            if len(locations_first) == len(locations_second):
+                print(len(locations_first))
+                vectors_new = locations_second[np.argsort(idr_second)] - locations_first[np.argsort(idr_first)]
             else:
                 print("shape does not match:")
-                print(len(locations_start))
-                print(len(locations_end))
+                print(len(locations_first))
+                print(len(locations_second))
+                # get successful ray casting (ray casting has intersections for both the first point and the second point)
+                idr_valid = np.intersect1d(idr_first, idr_second) # ordered
+                invalid_ids = np.setdiff1d(np.arange(len(vectors_new)),idr_valid)
+                sorter_first = np.argsort(idr_first)
+                sorter_second = np.argsort(idr_second)
+                idr_first_valid_index = sorter_first[np.searchsorted(idr_first, idr_valid, sorter=sorter_first)]
+                idr_second_valid_index = sorter_second[np.searchsorted(idr_second, idr_valid, sorter=sorter_second)]
+                vectors_success = locations_second[idr_second_valid_index] - locations_first[idr_first_valid_index]
+                # use original vector for unsuccessful ray casting
+                vectors_new[idr_valid] = vectors_success
+
+            # self.plotter.add_arrows(self.toolpath[:,:3], vectors_new, mag=3, color='blue', name='TCP_axis_final')
+
+            # find cases that the length of vectors_new is too large
+            lengths_vectors_new = np.linalg.norm(vectors_new, axis = 1)
+            length_threshold = 2 * (self.doubleSpinBox_tool_vector_second.value() - self.doubleSpinBox_tool_vector_first.value()) # deubg
+            if invalid_ids is None:
+                invalid_ids = np.where(lengths_vectors_new > length_threshold)[0]
+            else:
+                invalid_ids = np.union1d(invalid_ids, np.where(lengths_vectors_new > length_threshold)[0])
+
+            # # find cases that ray origin and its intersections are far away
+            # lengths_ray_first = locations_first[np.argsort(idr_first)] - points_vector_tool_first
+            # lengths_ray_second = locations_second[np.argsort(idr_second)] - points_vector_tool_second
+            # incorrect_vector_ids_by_ray_first = np.where(lengths_ray_first > length_threshold)[0]
+            # incorrect_vector_ids_by_ray_second = np.where(lengths_ray_second > length_threshold)[0]
+
+            # incorrect_vector_ids = reduce(np.union1d, (incorrect_vector_ids_by_ray_first,\
+            #         incorrect_vector_ids_by_vector_second, incorrect_vector_ids_by_vector_second))
+            valid_ids = np.setdiff1d(np.arange(len(vectors_new)), invalid_ids)
+
+            lengths_vectors_new = lengths_vectors_new.reshape((-1,1))
+            lengths_vectors_new = np.repeat(lengths_vectors_new, 3, axis=1)
+            vectors_new = vectors_new / lengths_vectors_new
+            vectors_valid = vectors_new[valid_ids]
+            vectors_invalid = vectors_new[invalid_ids]
+
+            # visualize vectors 
+            self.plotter.add_arrows(self.toolpath[valid_ids , :3], vectors_valid, mag=3, color='blue', name='TCP_axis_valid')
+            if len(invalid_ids) > 0:
+                self.plotter.add_arrows(self.toolpath[invalid_ids , :3], vectors_invalid, mag=3, color='red', name='TCP_axis_invalid')
 
             # # closest points
             # closest_pts = []
-            # for point in points_ends:
+            # for point in points_seconds:
             #     closest_pt_id = self.mesh_implant.find_closest_point(point)
             #     closest_pt = self.mesh_implant.points[closest_pt_id]
             #     closest_pts.append(closest_pt)
@@ -500,6 +555,8 @@ class MainWindow(Qt.QMainWindow):
         # self.toolpath = np.column_stack((points_tool, vectors_tool))
         # self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
         # self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis')
+
+        print("Finished toolpath generation")
 
     @staticmethod
     def poly12(x, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12):

@@ -1,0 +1,1 @@
+conda create --name pv -c conda-forge pyvista pyvistaqt trimesh rtree
