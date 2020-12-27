@@ -72,6 +72,7 @@ class MainWindow(Qt.QMainWindow):
         self.mesh_rgb = True
         self.mesh_extracted = None
         self.mesh_implant = None
+        self.mesh_defect_trimesh = None
         self.cell_picking_enabled = False
         self.projection_plane = None
         self.spline_widget = None
@@ -453,88 +454,104 @@ class MainWindow(Qt.QMainWindow):
 
         # visualize the result
         points_tool = self.spline_curve_fit.points
-        # points_seconds = points_tool + vectors_tool*3
-        # self.plotter.add_points(points_seconds, style='points', color='Red', point_size=20.0, name='seconds')
         self.toolpath = np.column_stack((points_tool, vectors_tool))
         # self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
         self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis_neg') # the one used before
         self.plotter.add_arrows(self.toolpath[:,:3], self.toolpath[:,3:], mag=3, color='green', name='TCP_axis_pos')
 
-        # 4. adjust the vectors to fit the defect wall (debug here: use self.mesh_defect)
-            # a) find tool_vector_first and tool_vector_second defined in GUI
-            # b) determine the direction for ray-casting, by checking if the initial vector is inside/outside the mesh
-            # c) perform ray-casting and define the new vector tool (NOTE: take care of the cases without interseciton, ex: bad scan)
+        # 4. adjust the vectors to fit the defect wall
+            # a) find tool_vector_first and tool_vector_second defined in GUI: the origin points for ray casting
+            # b) perform ray-casting and define the new vector tool
         points_vector_tool_first = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_first.value()
         points_vector_tool_second = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_second.value()
         # self.plotter.add_points(points_vector_tool_first, style='points', color='Red', point_size=20.0, name='first')
         # self.plotter.add_points(points_vector_tool_second, style='points', color='Green', point_size=20.0, name='seconds')
 
-        if self.mesh_defect_trimesh is not None:
+        if self.mesh_defect_trimesh is None:
+            print("Trimesh is not loaded")
+            return
+
+        else:
             # NOTE: the returned idr is the array of ray indices for intersects_location()
             locations_first, idr_first, idt_first = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_first, -vectors_along_plane_tangential, multiple_hits=False)
             locations_second, idr_second, idt_second = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_second, -vectors_along_plane_tangential, multiple_hits=False)
-
-            # if len(locations_first) > 0:
-            #     self.plotter.add_points(locations_first, style='points', color='black', point_size=20.0, name='ray_casted_first')
-            # if len(locations_second) > 0:
-            #     self.plotter.add_points(locations_second, style='points', color='black', point_size=20.0, name='ray_casted_second')
+            idr_first_sorted = np.sort(idr_first)
+            idr_second_sorted = np.sort(idr_second)
+            idr_first_argsorted = np.argsort(idr_first)
+            idr_second_argsorted = np.argsort(idr_second)
 
             # Update vectors_new with valid vectors from ray-casting and get indices for invalid ones
+            # NOTE: take care of the cases when ray casting fails
+            # (1) no intersections
+            # (2) length of the ray is too long
+            # (3) length of the new vector is too long
+
             invalid_ids = None
 
             if len(locations_first) < len(vectors_tool)//2 or len(locations_second) < len(vectors_tool)//2:
-                print("Ray casting fails! Num of Intersection is less than half of the number of the vectors.")
+                print("Ray casting fails! Num of intersection is less than half of the number of the vectors.")
                 return
 
             # check if number of intersections match:
             if len(locations_first) == len(locations_second):
-                print(len(locations_first))
-                vectors_new = locations_second[np.argsort(idr_second)] - locations_first[np.argsort(idr_first)]
+                print("number of intersections: " + str(len(locations_first)))
+                vectors_new = locations_second[idr_second_argsorted] - locations_first[idr_first_argsorted]
             else:
                 print("shape does not match:")
-                print(len(locations_first))
-                print(len(locations_second))
+                print("number of intersections from first points: " + str(len(locations_first)))
+                print("number of intersections from second points: " + str(len(locations_second)))
                 # get successful ray casting (ray casting has intersections for both the first point and the second point)
                 idr_valid = np.intersect1d(idr_first, idr_second) # ordered
                 invalid_ids = np.setdiff1d(np.arange(len(vectors_new)),idr_valid)
-                sorter_first = np.argsort(idr_first)
-                sorter_second = np.argsort(idr_second)
-                idr_first_valid_index = sorter_first[np.searchsorted(idr_first, idr_valid, sorter=sorter_first)]
-                idr_second_valid_index = sorter_second[np.searchsorted(idr_second, idr_valid, sorter=sorter_second)]
+                idr_first_valid_index = idr_first_argsorted[np.searchsorted(idr_first, idr_valid, sorter=idr_first_argsorted)]
+                idr_second_valid_index = idr_second_argsorted[np.searchsorted(idr_second, idr_valid, sorter=idr_second_argsorted)]
                 vectors_success = locations_second[idr_second_valid_index] - locations_first[idr_first_valid_index]
-                # use original vector for unsuccessful ray casting
+                # replace original vectors by successful ray casting
                 vectors_new[idr_valid] = vectors_success
 
-            # self.plotter.add_arrows(self.toolpath[:,:3], vectors_new, mag=3, color='blue', name='TCP_axis_final')
-
-            # find cases that the length of vectors_new is too large
+            # CASE: the length of vectors_new is too large
             lengths_vectors_new = np.linalg.norm(vectors_new, axis = 1)
             length_threshold = 2 * (self.doubleSpinBox_tool_vector_second.value() - self.doubleSpinBox_tool_vector_first.value()) # deubg
+            incorrect_vectors_new_lengths = np.where(lengths_vectors_new > length_threshold)[0]
             if invalid_ids is None:
-                invalid_ids = np.where(lengths_vectors_new > length_threshold)[0]
+                invalid_ids = incorrect_vectors_new_lengths
             else:
-                invalid_ids = np.union1d(invalid_ids, np.where(lengths_vectors_new > length_threshold)[0])
+                invalid_ids = np.union1d(invalid_ids, incorrect_vectors_new_lengths)
 
-            # # find cases that ray origin and its intersections are far away
-            # lengths_ray_first = locations_first[np.argsort(idr_first)] - points_vector_tool_first
-            # lengths_ray_second = locations_second[np.argsort(idr_second)] - points_vector_tool_second
-            # incorrect_vector_ids_by_ray_first = np.where(lengths_ray_first > length_threshold)[0]
-            # incorrect_vector_ids_by_ray_second = np.where(lengths_ray_second > length_threshold)[0]
+            # CASE: the length of ray is too large
+            lengths_ray_first = np.linalg.norm(locations_first[idr_first_argsorted] - points_vector_tool_first[idr_first_sorted], axis=1)
+            lengths_ray_second = np.linalg.norm(locations_second[idr_second_argsorted] - points_vector_tool_second[idr_second_sorted], axis=1)
+            incorrect_ray_lengths_first = idr_first_sorted[np.where(lengths_ray_first > length_threshold)[0]]
+            incorrect_ray_lengths_second = idr_second_sorted[np.where(lengths_ray_second > length_threshold)[0]]
+            if invalid_ids is None:
+                invalid_ids = np.union1d(incorrect_ray_lengths_first, incorrect_ray_lengths_second)
+            else:
+                invalid_ids = reduce(np.union1d, (invalid_ids,\
+                    incorrect_ray_lengths_first, incorrect_ray_lengths_second))
 
-            # incorrect_vector_ids = reduce(np.union1d, (incorrect_vector_ids_by_ray_first,\
-            #         incorrect_vector_ids_by_vector_second, incorrect_vector_ids_by_vector_second))
-            valid_ids = np.setdiff1d(np.arange(len(vectors_new)), invalid_ids)
-
+            # normalize vectors
             lengths_vectors_new = lengths_vectors_new.reshape((-1,1))
             lengths_vectors_new = np.repeat(lengths_vectors_new, 3, axis=1)
             vectors_new = vectors_new / lengths_vectors_new
-            vectors_valid = vectors_new[valid_ids]
-            vectors_invalid = vectors_new[invalid_ids]
 
-            # visualize vectors 
-            self.plotter.add_arrows(self.toolpath[valid_ids , :3], vectors_valid, mag=3, color='blue', name='TCP_axis_valid')
-            if len(invalid_ids) > 0:
-                self.plotter.add_arrows(self.toolpath[invalid_ids , :3], vectors_invalid, mag=3, color='red', name='TCP_axis_invalid')
+            # # visualize valid and invalid vectors 
+            # vectors_valid = vectors_new[valid_ids]
+            # vectors_invalid = vectors_new[invalid_ids]
+            # self.plotter.add_arrows(self.toolpath[valid_ids , :3], vectors_valid, mag=3, color='blue', name='TCP_axis_valid')
+            # if len(invalid_ids) > 0:
+            #     self.plotter.add_arrows(self.toolpath[invalid_ids , :3], vectors_invalid, mag=3, color='red', name='TCP_axis_invalid')
+
+            # find the neighboring and valid vectors, interpolate for invalid vectors_new
+            valid_ids = np.setdiff1d(np.arange(len(vectors_new)), invalid_ids)
+            insertion_ids = np.searchsorted(valid_ids, invalid_ids) # Binary search to find the insertion position
+            for invalid_id, insertion_id in zip(invalid_ids, insertion_ids):
+                next_id = valid_ids[insertion_id]
+                prev_id = valid_ids[insertion_id - 1]
+                vector_interpolated = (invalid_id - prev_id) * vectors_new[prev_id] + (next_id - invalid_id) * vectors_new[next_id]
+                vector_interpolated = vector_interpolated / (next_id - prev_id)
+                # update vector
+                vectors_new[invalid_id] = vector_interpolated
+            self.plotter.add_arrows(self.toolpath[:, :3], vectors_new, mag=3, color='blue', name='TCP_axis_final')
 
             # # closest points
             # closest_pts = []
