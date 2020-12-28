@@ -456,7 +456,7 @@ class MainWindow(Qt.QMainWindow):
         points_tool = self.spline_curve_fit.points
         self.toolpath = np.column_stack((points_tool, vectors_tool))
         # self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
-        self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis_neg') # the one used before
+        # self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis_neg') # the one used before
         self.plotter.add_arrows(self.toolpath[:,:3], self.toolpath[:,3:], mag=3, color='green', name='TCP_axis_pos')
 
         # 4. adjust the vectors to fit the defect wall
@@ -545,7 +545,10 @@ class MainWindow(Qt.QMainWindow):
             valid_ids = np.setdiff1d(np.arange(len(vectors_new)), invalid_ids)
             insertion_ids = np.searchsorted(valid_ids, invalid_ids) # Binary search to find the insertion position
             for invalid_id, insertion_id in zip(invalid_ids, insertion_ids):
-                next_id = valid_ids[insertion_id]
+                if insertion_id == len(valid_ids):
+                    next_id = valid_ids[0]
+                else:
+                    next_id = valid_ids[insertion_id]
                 prev_id = valid_ids[insertion_id - 1]
                 vector_interpolated = (invalid_id - prev_id) * vectors_new[prev_id] + (next_id - invalid_id) * vectors_new[next_id]
                 vector_interpolated = vector_interpolated / (next_id - prev_id)
