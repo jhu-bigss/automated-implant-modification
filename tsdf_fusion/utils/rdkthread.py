@@ -5,46 +5,41 @@ from PyQt5 import Qt, QtCore
 from robolink import *
 from robodk import robodk
 
-# Scanning parameters:
-auto_scan_camera_to_object_distance = 300
-reference_frame_wrt_robot_base = [772, -8, 420]
-auto_scan_tilt_angles = [80]
-auto_scan_planer_swing_angles = [[-30, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25, 30]]
+# Auto Scanning Parameters:
+# currently only implementing a circle path on top of the implant
+circle_height = 300
+circle_radius = 20
+num_of_poses = 10
 
 class RoboDK(QtCore.QThread):
 
     rdk = Robolink()
     automatic_capture_complete = QtCore.pyqtSignal()
 
-    ref_frame = robodk.transl(*reference_frame_wrt_robot_base)
-
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, reference_frame_wrt_robot_base=None):
         super().__init__()
 
         # check if RoboDK application is running
         if not self.rdk.Connect():
             print("Warning: RoboDK is not running.")
-            self.running = False
             return
-        else:
-            self.running = True
 
         self.robot = self.rdk.Item('', ITEM_TYPE_ROBOT)
 
-        # Check if reference frame exists, if yes, use it; if not, add default value
+        # Check if reference frame already existed, if yes, use it; if not, add new one
         ref_frame_query = self.rdk.Item('Reference', ITEM_TYPE_FRAME)
         if ref_frame_query.Valid():
             self.ref_frame = ref_frame_query
         else:
             self.ref_frame = self.rdk.AddFrame('Reference')
-            self.ref_frame.setPose(robodk.transl(*reference_frame_wrt_robot_base))
 
         parent.set_save_dir.connect(self.set_save_dir)
         parent.pose_capture.connect(self.save_robot_pose)
+        parent.update_ref_frame.connect(self.update_ref_frame)
         parent.close_window.connect(self.quit)
 
-        self.save_dir = parent.data_directory
-        self.image_capture = parent.image_capture
+        self.save_dir = parent.data_directory # data_dir path from parent
+        self.image_capture = parent.image_capture # grab image_capture signal from parent
 
         self.pose_counter = 0
 
@@ -59,15 +54,37 @@ class RoboDK(QtCore.QThread):
             self.robot.Disconnect()
             self.automatic_capture_complete.emit()
 
-    def get_ref_frame(self):
-        # return the translation part of the reference frame pose
-        if self.running:
-            xyz = self.ref_frame.Pose().Pos()
-        else:
-            xyz = self.ref_frame.Pos()
-        return xyz
+    @Qt.pyqtSlot(object)
+    def update_ref_frame(self, value):
+        # input value is a list of [x, y, z]
+        self.ref_frame.setPose(robodk.transl(*value))
 
     def generate_automatic_poses(self):
+        target_list = []
+        target_cnt = 1
+        h = circle_height
+        r = circle_radius
+        delta_theta = robodk.pi/num_of_poses
+
+        for i, tilt_angle in enumerate(auto_scan_tilt_angles):
+            for swing_angle in auto_scan_planer_swing_angles[i]:
+                # Pose position and orientation
+                x = - r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.cos(swing_angle*robodk.pi/180)
+                y = r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.sin(swing_angle*robodk.pi/180)
+                z = r * robodk.sin(tilt_angle*robodk.pi/180)
+                pose_offset_from_ref = robodk.Offset(self.ref_frame, x, y, z)
+                pose_offset_from_ref = pose_offset_from_ref * robodk.rotz(-(swing_angle+90)*robodk.pi/180) * robodk.rotx(-(tilt_angle+90)*robodk.pi/180)
+                self.robot.setPose(pose_offset_from_ref)
+                # Add new target
+                target = self.rdk.AddTarget(str(target_cnt))
+                target.setAsJointTarget()
+                target_list.append(target)
+                target_cnt += 1
+
+        return target_list
+
+    def generate_automatic_poses_by_tilt_and_swing_angles(self):
+        # this function is obsolete
         target_list = []
         target_cnt = 1
         r = auto_scan_camera_to_object_distance

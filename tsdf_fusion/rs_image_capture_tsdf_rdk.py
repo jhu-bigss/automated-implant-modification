@@ -13,6 +13,7 @@ from utils.rdkthread import RoboDK
 from utils import fusion
 
 data_foler = 'data/'
+vol_origion_wrt_robot_base = [772, -8, 420] # mm
 
 class MainWidget(Qt.QWidget):
 
@@ -20,6 +21,7 @@ class MainWidget(Qt.QWidget):
     set_save_dir = QtCore.pyqtSignal(str)
     image_capture = QtCore.pyqtSignal()
     pose_capture = QtCore.pyqtSignal()
+    update_ref_frame = QtCore.pyqtSignal(object)
     close_window = QtCore.pyqtSignal()
 
     def __init__(self, name=None, parent=None, show=True):
@@ -61,17 +63,36 @@ class MainWidget(Qt.QWidget):
         self.vol_marching_cube_size = Qt.QDoubleSpinBox()
         self.vol_marching_cube_size.setSingleStep(0.5)
         self.vol_marching_cube_size.setValue(1)
+        self.vol_origin_x = Qt.QDoubleSpinBox()
+        self.vol_origin_x.setMaximum(1000)
+        self.vol_origin_x.setMinimum(-1000)
+        self.vol_origin_x.setValue(vol_origion_wrt_robot_base[0])
+        self.vol_origin_y = Qt.QDoubleSpinBox()
+        self.vol_origin_y.setMaximum(1000)
+        self.vol_origin_y.setMinimum(-1000)
+        self.vol_origin_y.setValue(vol_origion_wrt_robot_base[1])
+        self.vol_origin_z = Qt.QDoubleSpinBox()
+        self.vol_origin_z.setMaximum(1000)
+        self.vol_origin_z.setMinimum(-1000)
+        self.vol_origin_z.setValue(vol_origion_wrt_robot_base[2])
+        self.vol_truncate_margin_half = Qt.QDoubleSpinBox()
+        self.vol_truncate_margin_half.setMaximum(100)
+        self.vol_truncate_margin_half.setValue(3)
         self.run_tsdf_button = Qt.QPushButton("Run TSDF")
 
         self.open_dir_button.clicked.connect(self.open_data_directory)
         self.toggle_view_mode_button.clicked.connect(self.change_view_mode)
         self.toggle_tsdf_mode_button.clicked.connect(self.change_tsdf_mode)
         self.capture_button.clicked.connect(self.capture_event)
+        self.vol_origin_x.valueChanged.connect(self.update_rdk_ref_frame)
+        self.vol_origin_y.valueChanged.connect(self.update_rdk_ref_frame)
+        self.vol_origin_z.valueChanged.connect(self.update_rdk_ref_frame)
         self.run_tsdf_button.clicked.connect(self.run_tsdf)
 
         # GUI layouts
         vlayout = Qt.QVBoxLayout()
         vlayout.addWidget(self.cv_label)
+
         hlayout_0 = Qt.QHBoxLayout()
         hlayout_0.addWidget(self.open_dir_button)
         hlayout_0.addWidget(self.toggle_view_mode_button)
@@ -79,17 +100,44 @@ class MainWidget(Qt.QWidget):
         hlayout_0.addWidget(self.capture_button)
         hlayout_0.addWidget(self.run_tsdf_button)
         vlayout.addLayout(hlayout_0)
+
         hlayout_1 = Qt.QHBoxLayout()
+        vlayout.addLayout(hlayout_1)
         hlayout_1.addWidget(Qt.QLabel("TSDF Parameters: "))
+        vlayout_1 = Qt.QVBoxLayout()
+        hlayout_1.addLayout(vlayout_1)
+
+        hlayout_1 = Qt.QHBoxLayout()
+        hlayout_1.addWidget(Qt.QLabel("Volume "))
         hlayout_1.addWidget(Qt.QLabel("Width"))
         hlayout_1.addWidget(self.vol_width_dspinbox)
         hlayout_1.addWidget(Qt.QLabel("Height"))
         hlayout_1.addWidget(self.vol_height_dspinbox)
         hlayout_1.addWidget(Qt.QLabel("Resolution"))
         hlayout_1.addWidget(self.vol_marching_cube_size)
-        vlayout.addLayout(hlayout_1)
+        vlayout_1.addLayout(hlayout_1)
+
+        hlayout_2 = Qt.QHBoxLayout()
+        hlayout_2.addWidget(Qt.QLabel("Offset w.r.t Robot Base"))
+        hlayout_2.addWidget(Qt.QLabel("X"))
+        hlayout_2.addWidget(self.vol_origin_x)
+        hlayout_2.addWidget(Qt.QLabel("Y"))
+        hlayout_2.addWidget(self.vol_origin_y)
+        hlayout_2.addWidget(Qt.QLabel("Z"))
+        hlayout_2.addWidget(self.vol_origin_z)
+        vlayout_1.addLayout(hlayout_2)
+
+        hlayout_3 = Qt.QHBoxLayout()
+        hlayout_3.addWidget(Qt.QLabel("Implant Thickness (Truncate Margin) = "))
+        hlayout_3.addWidget(self.vol_truncate_margin_half)
+        hlayout_3.addWidget(Qt.QLabel(" mm"))
+        vlayout_1.addLayout(hlayout_3)
+
         vlayout.setContentsMargins(0,0,0,0)
         self.setLayout(vlayout)
+
+        # initialize RoboDK reference frame
+        self.update_rdk_ref_frame()
 
         if show:
             self.show()
@@ -148,6 +196,9 @@ class MainWidget(Qt.QWidget):
             self.capture_button.setText("Capture")
             self.run_tsdf_button.setEnabled(True)
 
+    def update_rdk_ref_frame(self):
+        self.update_ref_frame.emit([self.vol_origin_x.value(), self.vol_origin_y.value(), self.vol_origin_z.value()])
+
     def capture_event(self):
         if self.toggle_tsdf_mode_button.isChecked():
             # Automatic mode
@@ -159,8 +210,8 @@ class MainWidget(Qt.QWidget):
 
     def run_tsdf(self):
         vol_bnds = np.zeros((3,2))
-        vol_bnds[:,0] = np.array(self.rdk.get_ref_frame()) - np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, 0])
-        vol_bnds[:,1] = np.array(self.rdk.get_ref_frame()) + np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
+        vol_bnds[:,0] = np.array([self.vol_origin_x.value(), self.vol_origin_y.value(), self.vol_origin_z.value()]) - np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, 0])
+        vol_bnds[:,1] = np.array([self.vol_origin_x.value(), self.vol_origin_y.value(), self.vol_origin_z.value()]) + np.array([self.vol_width_dspinbox.value()/2, self.vol_width_dspinbox.value()/2, self.vol_height_dspinbox.value()])
 
         # ======================================================================================================== #
         # Integrate
