@@ -61,25 +61,19 @@ class RoboDK(QtCore.QThread):
 
     def generate_automatic_poses(self):
         target_list = []
-        target_cnt = 1
-        h = circle_height
-        r = circle_radius
-        delta_theta = robodk.pi/num_of_poses
-
-        for i, tilt_angle in enumerate(auto_scan_tilt_angles):
-            for swing_angle in auto_scan_planer_swing_angles[i]:
-                # Pose position and orientation
-                x = - r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.cos(swing_angle*robodk.pi/180)
-                y = r * robodk.cos(tilt_angle*robodk.pi/180) * robodk.sin(swing_angle*robodk.pi/180)
-                z = r * robodk.sin(tilt_angle*robodk.pi/180)
-                pose_offset_from_ref = robodk.Offset(self.ref_frame, x, y, z)
-                pose_offset_from_ref = pose_offset_from_ref * robodk.rotz(-(swing_angle+90)*robodk.pi/180) * robodk.rotx(-(tilt_angle+90)*robodk.pi/180)
-                self.robot.setPose(pose_offset_from_ref)
-                # Add new target
-                target = self.rdk.AddTarget(str(target_cnt))
-                target.setAsJointTarget()
-                target_list.append(target)
-                target_cnt += 1
+        theta = 0
+        delta_theta = 2*robodk.pi/num_of_poses
+        origin_offset = self.ref_frame.Pose().Pos()
+        circle_center = robodk.add3(origin_offset, [0, 0, circle_height])
+        
+        for i in range(num_of_poses + 1):
+            perimeter_offset = [circle_radius*robodk.cos(theta), circle_radius*robodk.sin(theta), 0]
+            target_position = robodk.add3(circle_center, perimeter_offset)
+            target_z_axis = robodk.normalize3(robodk.subs3(origin_offset, target_position))
+            # TODO: target orientation
+            target_x_axis = None
+            target_y_axis = None
+            theta += delta_theta
 
         return target_list
 

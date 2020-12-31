@@ -2,7 +2,7 @@
 RoboDK capture images with RealSense camera based on PyQt
 """
 
-import os, sys, shutil, time, glob
+import os, sys, time, glob
 import numpy as np
 import cv2
 
