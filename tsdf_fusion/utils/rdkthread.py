@@ -5,18 +5,14 @@ from PyQt5 import Qt, QtCore
 from robolink import *
 from robodk import robodk
 
-# Auto Scanning Parameters:
-# currently only implementing a circle path on top of the implant
-circle_height = 300
-circle_radius = 20
-num_of_poses = 10
+from .rdkpathplanner import PathPlanner
 
 class RoboDK(QtCore.QThread):
 
     rdk = Robolink()
     automatic_capture_complete = QtCore.pyqtSignal()
 
-    def __init__(self, parent=None, reference_frame_wrt_robot_base=None):
+    def __init__(self, parent=None):
         super().__init__()
 
         # check if RoboDK application is running
@@ -36,6 +32,7 @@ class RoboDK(QtCore.QThread):
         parent.set_save_dir.connect(self.set_save_dir)
         parent.pose_capture.connect(self.save_robot_pose)
         parent.update_ref_frame.connect(self.update_ref_frame)
+        parent.update_scan_circle.connect(self.update_scan_circle)
         parent.close_window.connect(self.quit)
 
         self.save_dir = parent.data_directory # data_dir path from parent
@@ -44,7 +41,7 @@ class RoboDK(QtCore.QThread):
         self.pose_counter = 0
 
     def run(self):
-        targets = self.generate_automatic_poses()
+        targets = self.generate_circular_poses()
         if self.connect_robot():
             for target in targets:
                 self.robot.MoveJ(target)
@@ -59,25 +56,47 @@ class RoboDK(QtCore.QThread):
         # input value is a list of [x, y, z]
         self.ref_frame.setPose(robodk.transl(*value))
 
-    def generate_automatic_poses(self):
+    @Qt.pyqtSlot(object)
+    def update_scan_circle(self, value):
+        # input value is a list of [h, r, num_of_poses]
+        self.circle_height = value[0]
+        self.circle_radius = value[1]
+        self.num_of_poses = value[2]
+
+    def generate_circular_poses(self):
         target_list = []
         theta = 0
-        delta_theta = 2*robodk.pi/num_of_poses
+        delta_theta = 2*robodk.pi/self.num_of_poses
         origin_offset = self.ref_frame.Pose().Pos()
-        circle_center = robodk.add3(origin_offset, [0, 0, circle_height])
+        circle_center = robodk.add3(origin_offset, [0, 0, self.circle_height])
+        # set the first pose at the circle center
+        pose_0 = robodk.Mat().eye() # initialize the pose with an identity matrix
+        pose_0.setPos(circle_center)
+        pose_0.setVZ([0,0,-1])
+        pose_0.setVY([-1,0,0])
+        pose_0.setVX([0,-1,0])
+        target_list.append(pose_0)
         
-        for i in range(num_of_poses + 1):
-            perimeter_offset = [circle_radius*robodk.cos(theta), circle_radius*robodk.sin(theta), 0]
-            target_position = robodk.add3(circle_center, perimeter_offset)
+        for i in range(self.num_of_poses + 1):
+            pose = robodk.Mat().eye()
+            radius_offset = [self.circle_radius*robodk.cos(theta), self.circle_radius*robodk.sin(theta), 0]
+            target_position = robodk.add3(circle_center, radius_offset)
             target_z_axis = robodk.normalize3(robodk.subs3(origin_offset, target_position))
-            # TODO: target orientation
-            target_x_axis = None
-            target_y_axis = None
+            target_x_axis, target_y_axis = PathPlanner.generate_pose_by_z_axis_while_constrain_x_axis_in_YZ_plane(target_z_axis)
+            pose.setPos(target_position)
+            pose.setVZ(target_z_axis)
+            pose.setVY(target_y_axis)
+            pose.setVX(target_x_axis)
+            target_list.append(pose)
+            # print(robodk.Pose_2_KUKA(pose))
             theta += delta_theta
+
+        # the last pose
+        target_list.append(pose_0)
 
         return target_list
 
-    def generate_automatic_poses_by_tilt_and_swing_angles(self):
+    def generate_spherical_poses_by_tilt_and_swing_angles(self):
         # this function is obsolete
         target_list = []
         target_cnt = 1

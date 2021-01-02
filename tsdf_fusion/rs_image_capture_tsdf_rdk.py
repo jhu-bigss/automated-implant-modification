@@ -22,6 +22,7 @@ class MainWidget(Qt.QWidget):
     image_capture = QtCore.pyqtSignal()
     pose_capture = QtCore.pyqtSignal()
     update_ref_frame = QtCore.pyqtSignal(object)
+    update_scan_circle = QtCore.pyqtSignal(object)
     close_window = QtCore.pyqtSignal()
 
     def __init__(self, name=None, parent=None, show=True):
@@ -79,6 +80,15 @@ class MainWidget(Qt.QWidget):
         self.vol_truncate_margin_half.setMaximum(100)
         self.vol_truncate_margin_half.setValue(3)
         self.run_tsdf_button = Qt.QPushButton("Run TSDF")
+        self.scan_circle_height = Qt.QDoubleSpinBox()
+        self.scan_circle_height.setMaximum(500)
+        self.scan_circle_height.setValue(300)
+        self.scan_circle_radius = Qt.QDoubleSpinBox()
+        self.scan_circle_radius.setMaximum(100)
+        self.scan_circle_radius.setValue(50)
+        self.scan_num_of_circular_poses = Qt.QSpinBox()
+        self.scan_num_of_circular_poses.setMaximum(99)
+        self.scan_num_of_circular_poses.setValue(10)
 
         self.open_dir_button.clicked.connect(self.open_data_directory)
         self.toggle_view_mode_button.clicked.connect(self.change_view_mode)
@@ -87,6 +97,9 @@ class MainWidget(Qt.QWidget):
         self.vol_origin_x.valueChanged.connect(self.update_rdk_ref_frame)
         self.vol_origin_y.valueChanged.connect(self.update_rdk_ref_frame)
         self.vol_origin_z.valueChanged.connect(self.update_rdk_ref_frame)
+        self.scan_circle_height.valueChanged.connect(self.update_rdk_scan_circle)
+        self.scan_circle_radius.valueChanged.connect(self.update_rdk_scan_circle)
+        self.scan_num_of_circular_poses.valueChanged.connect(self.update_rdk_scan_circle)
         self.run_tsdf_button.clicked.connect(self.run_tsdf)
 
         # GUI layouts
@@ -109,11 +122,11 @@ class MainWidget(Qt.QWidget):
 
         hlayout_1 = Qt.QHBoxLayout()
         hlayout_1.addWidget(Qt.QLabel("Volume "))
-        hlayout_1.addWidget(Qt.QLabel("Width"))
+        hlayout_1.addWidget(Qt.QLabel("Width ="))
         hlayout_1.addWidget(self.vol_width_dspinbox)
-        hlayout_1.addWidget(Qt.QLabel("Height"))
+        hlayout_1.addWidget(Qt.QLabel("Height ="))
         hlayout_1.addWidget(self.vol_height_dspinbox)
-        hlayout_1.addWidget(Qt.QLabel("Resolution"))
+        hlayout_1.addWidget(Qt.QLabel("Resolution ="))
         hlayout_1.addWidget(self.vol_marching_cube_size)
         vlayout_1.addLayout(hlayout_1)
 
@@ -128,16 +141,27 @@ class MainWidget(Qt.QWidget):
         vlayout_1.addLayout(hlayout_2)
 
         hlayout_3 = Qt.QHBoxLayout()
-        hlayout_3.addWidget(Qt.QLabel("Implant Thickness (Truncate Margin) = "))
-        hlayout_3.addWidget(self.vol_truncate_margin_half)
-        hlayout_3.addWidget(Qt.QLabel(" mm"))
+        hlayout_3.addWidget(Qt.QLabel("Top Circle "))
+        hlayout_3.addWidget(Qt.QLabel("h ="))
+        hlayout_3.addWidget(self.scan_circle_height)
+        hlayout_3.addWidget(Qt.QLabel("r ="))
+        hlayout_3.addWidget(self.scan_circle_radius)
+        hlayout_3.addWidget(Qt.QLabel("num of poses ="))
+        hlayout_3.addWidget(self.scan_num_of_circular_poses)
         vlayout_1.addLayout(hlayout_3)
+
+        hlayout_4 = Qt.QHBoxLayout()
+        hlayout_4.addWidget(Qt.QLabel("Implant Thickness (1/2 Truncate Margin) = "))
+        hlayout_4.addWidget(self.vol_truncate_margin_half)
+        hlayout_4.addWidget(Qt.QLabel(" mm"))
+        vlayout_1.addLayout(hlayout_4)
 
         vlayout.setContentsMargins(0,0,0,0)
         self.setLayout(vlayout)
 
-        # initialize RoboDK reference frame
+        # initialize RoboDK reference frame and scan circle parameters
         self.update_rdk_ref_frame()
+        self.update_rdk_scan_circle()
 
         if show:
             self.show()
@@ -199,6 +223,9 @@ class MainWidget(Qt.QWidget):
     def update_rdk_ref_frame(self):
         self.update_ref_frame.emit([self.vol_origin_x.value(), self.vol_origin_y.value(), self.vol_origin_z.value()])
 
+    def update_rdk_scan_circle(self):
+        self.update_scan_circle.emit([self.scan_circle_height.value(), self.scan_circle_radius.value(), self.scan_num_of_circular_poses.value()])
+
     def capture_event(self):
         if self.toggle_tsdf_mode_button.isChecked():
             # Automatic mode
@@ -218,7 +245,7 @@ class MainWidget(Qt.QWidget):
         # ======================================================================================================== #
         # Initialize voxel volume
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=self.vol_marching_cube_size.value())
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=self.vol_marching_cube_size.value(), truncate_margin_half = self.vol_truncate_margin_half)
 
         # Detect how many frames in data directory
         n_imgs = len(glob.glob1(self.data_directory, "*.jpg"))
