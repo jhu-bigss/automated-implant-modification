@@ -13,7 +13,10 @@ from utils.rdkthread import RoboDK
 from utils import fusion
 
 data_foler = 'data/'
-vol_origion_wrt_robot_base = [772, -8, 420] # mm
+vol_origion_wrt_robot_base = [773, 0, 415] # mm
+vol_default_width = 200
+vol_default_height = 70
+vol_default_resolution = 1
 
 class MainWidget(Qt.QWidget):
 
@@ -57,13 +60,13 @@ class MainWidget(Qt.QWidget):
         # Parameters inputs for TSDF
         self.vol_width_dspinbox = Qt.QDoubleSpinBox()
         self.vol_width_dspinbox.setMaximum(1000)
-        self.vol_width_dspinbox.setValue(250)
+        self.vol_width_dspinbox.setValue(vol_default_width)
         self.vol_height_dspinbox = Qt.QDoubleSpinBox()
         self.vol_height_dspinbox.setMaximum(250)
-        self.vol_height_dspinbox.setValue(50)
+        self.vol_height_dspinbox.setValue(vol_default_height)
         self.vol_marching_cube_size = Qt.QDoubleSpinBox()
         self.vol_marching_cube_size.setSingleStep(0.5)
-        self.vol_marching_cube_size.setValue(1)
+        self.vol_marching_cube_size.setValue(vol_default_resolution)
         self.vol_origin_x = Qt.QDoubleSpinBox()
         self.vol_origin_x.setMaximum(1000)
         self.vol_origin_x.setMinimum(-1000)
@@ -245,7 +248,7 @@ class MainWidget(Qt.QWidget):
         # ======================================================================================================== #
         # Initialize voxel volume
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=self.vol_marching_cube_size.value(), truncate_margin_half = self.vol_truncate_margin_half)
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=self.vol_marching_cube_size.value(), truncate_margin_half = self.vol_truncate_margin_half.value())
 
         # Detect how many frames in data directory
         n_imgs = len(glob.glob1(self.data_directory, "*.jpg"))
