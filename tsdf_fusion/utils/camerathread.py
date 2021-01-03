@@ -76,7 +76,7 @@ class CameraRealsense(QtCore.QThread):
                     continue
 
                 # convert image to numpy arr
-                self.depth_image = (np.asanyarray(depth_frame.get_data()) * self.depth_scale * 1000).astype(int)
+                self.depth_image = (np.asanyarray(depth_frame.get_data()) * self.depth_scale * 1000).astype(np.uint16)
                 self.color_image = np.asanyarray(color_frame.get_data())
 
                 if self.view_mode_bg_removed:

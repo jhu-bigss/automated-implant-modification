@@ -14,7 +14,7 @@ from utils import fusion
 
 data_foler = 'data/'
 vol_origion_wrt_robot_base = [773, 0, 415] # mm
-vol_default_width = 200
+vol_default_width = 240
 vol_default_height = 70
 vol_default_resolution = 1
 
