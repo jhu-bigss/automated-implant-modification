@@ -79,9 +79,9 @@ class MainWidget(Qt.QWidget):
         self.vol_origin_z.setMaximum(1000)
         self.vol_origin_z.setMinimum(-1000)
         self.vol_origin_z.setValue(vol_origion_wrt_robot_base[2])
-        self.vol_truncate_margin_half = Qt.QDoubleSpinBox()
-        self.vol_truncate_margin_half.setMaximum(100)
-        self.vol_truncate_margin_half.setValue(3)
+        self.vol_truncate_margin = Qt.QDoubleSpinBox()
+        self.vol_truncate_margin.setMaximum(100)
+        self.vol_truncate_margin.setValue(3)
         self.run_tsdf_button = Qt.QPushButton("Run TSDF")
         self.scan_circle_height = Qt.QDoubleSpinBox()
         self.scan_circle_height.setMaximum(500)
@@ -154,8 +154,8 @@ class MainWidget(Qt.QWidget):
         vlayout_1.addLayout(hlayout_3)
 
         hlayout_4 = Qt.QHBoxLayout()
-        hlayout_4.addWidget(Qt.QLabel("Implant Thickness (1/2 Truncate Margin) = "))
-        hlayout_4.addWidget(self.vol_truncate_margin_half)
+        hlayout_4.addWidget(Qt.QLabel("Implant Thickness (Truncate Margin) = "))
+        hlayout_4.addWidget(self.vol_truncate_margin)
         hlayout_4.addWidget(Qt.QLabel(" mm"))
         vlayout_1.addLayout(hlayout_4)
 
@@ -248,7 +248,7 @@ class MainWidget(Qt.QWidget):
         # ======================================================================================================== #
         # Initialize voxel volume
         print("Initializing voxel volume...")
-        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=self.vol_marching_cube_size.value(), truncate_margin_half = self.vol_truncate_margin_half.value())
+        tsdf_vol = fusion.TSDFVolume(vol_bnds, voxel_size=self.vol_marching_cube_size.value(), truncate_margin = self.vol_truncate_margin.value())
 
         # Detect how many frames in data directory
         n_imgs = len(glob.glob1(self.data_directory, "*.jpg"))

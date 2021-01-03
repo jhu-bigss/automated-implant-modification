@@ -19,7 +19,7 @@ except Exception as err:
 class TSDFVolume:
   """Volumetric TSDF Fusion of RGB-D Images.
   """
-  def __init__(self, vol_bnds, voxel_size, truncate_margin_half, use_gpu=True):
+  def __init__(self, vol_bnds, voxel_size, truncate_margin, use_gpu=True):
     """Constructor.
 
     Args:
@@ -32,8 +32,8 @@ class TSDFVolume:
 
     # Define voxel volume parameters
     self._vol_bnds = vol_bnds
-    self._voxel_size = float(voxel_size)
-    self._trunc_margin = 2 * truncate_margin_half * self._voxel_size
+    self._voxel_size = voxel_size
+    self._trunc_margin = truncate_margin * self._voxel_size
     self._color_const = 256 * 256
 
     # Adjust volume bounds and ensure C-order contiguous
