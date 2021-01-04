@@ -5,15 +5,15 @@ import numpy as np
 from numba import njit, prange
 from skimage import measure
 
-try:
-  import pycuda.driver as cuda
-  import pycuda.autoinit
-  from pycuda.compiler import SourceModule
-  FUSION_GPU_MODE = 1
-except Exception as err:
-  print('Warning: {}'.format(err))
-  print('Failed to import PyCUDA. Running fusion in CPU mode.')
-  FUSION_GPU_MODE = 0
+# try:
+#   import pycuda.driver as cuda
+#   import pycuda.autoinit
+#   from pycuda.compiler import SourceModule
+#   FUSION_GPU_MODE = 1
+# except Exception as err:
+#   print('Warning: {}'.format(err))
+#   print('Failed to import PyCUDA. Running fusion in CPU mode.')
+#   FUSION_GPU_MODE = 0
 
 
 class TSDFVolume:
@@ -268,6 +268,17 @@ class TSDFVolume:
       depth_diff = depth_val - pix_z
       valid_pts = np.logical_and(depth_val > 0, depth_diff >= -self._trunc_margin)
       dist = np.minimum(1, depth_diff / self._trunc_margin)
+      # === Begin my implementation ===
+      # valid_pts = depth_val > 0
+      # dist = np.empty_like(depth_diff)
+      # for i, sign in enumerate(np.sign(depth_diff)):
+      #   if sign > 0:
+      #     dist[i] = np.minimum(1, depth_diff[i]/self._trunc_margin)
+      #   elif sign < 0:
+      #     dist[i] = np.maximum(-1, depth_diff[i]/self._trunc_margin)
+      #   else:
+      #     dist[i] = 0.0
+      # === End my implementation ===
       valid_vox_x = self.vox_coords[valid_pts, 0]
       valid_vox_y = self.vox_coords[valid_pts, 1]
       valid_vox_z = self.vox_coords[valid_pts, 2]
