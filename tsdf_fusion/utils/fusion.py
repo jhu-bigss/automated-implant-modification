@@ -5,15 +5,15 @@ import numpy as np
 from numba import njit, prange
 from skimage import measure
 
-# try:
-#   import pycuda.driver as cuda
-#   import pycuda.autoinit
-#   from pycuda.compiler import SourceModule
-#   FUSION_GPU_MODE = 1
-# except Exception as err:
-#   print('Warning: {}'.format(err))
-#   print('Failed to import PyCUDA. Running fusion in CPU mode.')
-#   FUSION_GPU_MODE = 0
+try:
+  import pycuda.driver as cuda
+  import pycuda.autoinit
+  from pycuda.compiler import SourceModule
+  FUSION_GPU_MODE = 1
+except Exception as err:
+  print('Warning: {}'.format(err))
+  print('Failed to import PyCUDA. Running fusion in CPU mode.')
+  FUSION_GPU_MODE = 0
 
 
 class TSDFVolume:
