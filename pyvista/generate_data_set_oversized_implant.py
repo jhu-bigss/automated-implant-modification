@@ -16,9 +16,9 @@ class MainWidget(Qt.QWidget):
         self.load_button = Qt.QPushButton("Load")
         self.spline_resolution_label = Qt.QLabel("Resolution")
         self.spline_resolution_spinbox = Qt.QSpinBox()
+        self.spline_resolution_spinbox.setMaximum(1000)
         self.spline_resolution_spinbox.setValue(100)
-        self.spline_clip_button = Qt.QPushButton("Add Defect Spline")
-        self.spline_keep_checkbox = Qt.QCheckBox("Keep")
+        self.spline_clip_button = Qt.QPushButton("Create Spline")
         self.save_button = Qt.QPushButton("Save")
 
         self.load_button.clicked.connect(self.load_mesh_event)
@@ -34,14 +34,13 @@ class MainWidget(Qt.QWidget):
         hlayout_2 = Qt.QHBoxLayout()
         hlayout_2.addWidget(self.spline_resolution_label)
         hlayout_2.addWidget(self.spline_resolution_spinbox)
-        hlayout_2.addWidget(self.spline_keep_checkbox)
         hlayout_1.addLayout(hlayout_2)
         hlayout_1.addWidget(self.spline_clip_button)
         hlayout_1.addWidget(self.save_button)
         vlayout_main.addLayout(hlayout_1)
         self.setLayout(vlayout_main)
 
-        self.setWindowTitle("Generate experiment data set - defect skull/implant")
+        self.setWindowTitle("Generate experiment data set - implant only")
         self.setGeometry(500, 150, 1000, 800)
 
         # Enable dragging and dropping onto the GUI
@@ -52,18 +51,12 @@ class MainWidget(Qt.QWidget):
         self.plotter.enable_point_picking(self.point_picking_event, show_message=False, show_point=False)
         self.plotter.enable_depth_peeling()
         self.mesh = None
-        self.defect_sphere_widgets = []
         self.implant_sphere_widgets = []
-        self.defect_spline_widget = None
         self.implant_spline_widget = None
         self.line_widget = None
         self.line_widget_point_2 = None
         self.extrude_shrink_ratio = 0
-        self.defect_spline_skirt = None
         self.implant_spline_skirt = None
-        self.clip_plane = None
-        self.clip_plane_normal = 'z'
-        self.clip_plane_origin = None
 
         if show:
             self.show()
@@ -120,28 +113,18 @@ class MainWidget(Qt.QWidget):
 
     def save_mesh(self):
         """
-        Save generated defect skull and implant mesh
+        Save generated implant mesh
         """
-        f_name, f_filter = Qt.QFileDialog.getSaveFileName(self, 'Save defect skull', self.fname, "(*.stl) ;; (*.ply)")
-        pv.save_meshio(f_name, self.defect_skull_mesh, file_format=f_filter.strip('(*.)'))
         f_name, f_filter = Qt.QFileDialog.getSaveFileName(self, 'Save implant', self.fname, "(*.stl) ;; (*.ply)")
         pv.save_meshio(f_name, self.implant_mesh, file_format=f_filter.strip('(*.)'))
 
     
     def point_picking_event(self, point):
-        if self.defect_spline_widget is None:
-            return self.plotter.add_sphere_widget(callback=self.defect_sphere_widget_callback, center=point, radius=2, pass_widget=True)
-        elif self.implant_spline_widget is None:
+        if self.implant_spline_widget is None:
             return self.plotter.add_sphere_widget(callback=self.implant_sphere_widget_callback, center=point, radius=2, pass_widget=True)
         else:
-            print("Both splines already created, point picking is not allowed")
+            print("The clip spline is already created, point picking is not allowed")
 
-    def defect_sphere_widget_callback(self, point, widget):
-        if widget in self.defect_sphere_widgets:
-            widget.SetCenter(point)
-        else:
-            self.defect_sphere_widgets.append(widget)
-            
     def implant_sphere_widget_callback(self, point, widget):
         if widget in self.implant_sphere_widgets:
             widget.SetCenter(point)
@@ -149,41 +132,19 @@ class MainWidget(Qt.QWidget):
             self.implant_sphere_widgets.append(widget)
 
     def spline_skirt_clip_event(self):
-        # 1. create defect spline skirt
-        # only allow adding one spline widget
-        if self.defect_spline_widget is None:
-            self.plotter.add_spline_widget(self.defect_spline_callback, n_hanldes=len(self.defect_sphere_widgets), resolution=self.spline_resolution_spinbox.value(), pass_widget=True)
+        if self.implant_spline_widget is None:
+            # 1. create implant spline skirt
+            self.plotter.add_spline_widget(self.implant_spline_callback, n_hanldes=len(self.implant_sphere_widgets), resolution=self.spline_resolution_spinbox.value(), pass_widget=True)
             if self.line_widget is None:
                 self.plotter.add_slider_widget(self.slider_widget_callback, rng=(0,1), value=self.extrude_shrink_ratio)
                 self.plotter.add_line_widget(self.line_widget_callback, pass_widget=True)
-            self.spline_clip_button.setText("Add implant spline")
-        elif self.implant_spline_widget is None:
-            # 2. create implant spline skirt
-            self.plotter.add_spline_widget(self.implant_spline_callback, n_hanldes=len(self.implant_sphere_widgets), resolution=self.spline_resolution_spinbox.value(), pass_widget=True)
             self.spline_resolution_spinbox.setEnabled(False)
             self.spline_clip_button.setText("Cut")
         else:
-            # 3. clip the mesh by the spline skirt to generate data set
+            # 2. clip the mesh by the spline skirt to generate data set
             self.spline_clip_button.setEnabled(False)
             self.clip_mesh_by_spline_skirt()
 
-    def defect_spline_callback(self, spline_polydata, widget):
-        # 1. creant spline widget
-        if self.defect_spline_widget is None:
-            # create spline given handle positions and make it CLOSED
-            for i, sphere in enumerate(self.defect_sphere_widgets):
-                widget.SetHandlePosition(i, *sphere.GetCenter())
-            if not widget.GetClosed():
-                widget.ClosedOn()
-            self.defect_spline_widget = widget
-            # disable sphere widgets once spline being created
-            self.plotter.clear_sphere_widgets()
-        else:
-            # 2. manipulate spline widget --> update line widget
-            self.line_widget_point_1 = spline_polydata.center
-            self.line_widget.SetPoint1(self.line_widget_point_1)
-            self.update_spline_skirt()
-            
     def implant_spline_callback(self, spline_polydata, widget):
         # 1. creant spline widget
         if self.implant_spline_widget is None:
@@ -210,7 +171,7 @@ class MainWidget(Qt.QWidget):
         if self.line_widget is None:
             # grab the spline polydata
             spline_polydata = pv.PolyData()
-            self.defect_spline_widget.GetPolyData(spline_polydata)
+            self.implant_spline_widget.GetPolyData(spline_polydata)
             widget.SetPoint1(spline_polydata.center)
             if self.line_widget_point_2 is not None:
                 widget.SetPoint2(self.line_widget_point_2)
@@ -231,8 +192,7 @@ class MainWidget(Qt.QWidget):
                 vec_new_norm = vec_new / np.linalg.norm(vec_new)
                 vec_translate = scalar_translate * vec_new_norm
                 R = self.rotation_matrix_from_vectors(vec_old, vec_new)
-                # update both spline widget handles
-                self.transform_spline_widget(self.defect_spline_widget, rotate_center, vec_translate, R)
+                # update spline widget handles
                 self.transform_spline_widget(self.implant_spline_widget, rotate_center, vec_translate, R)
             # update line widget point 1
             self.line_widget_point_1 = rotate_sphere_handle
@@ -241,22 +201,6 @@ class MainWidget(Qt.QWidget):
     def update_spline_skirt(self):
         # grab the spline widget polydata and the line widget polydata
         vec_extrude = np.asarray(self.line_widget.GetPoint2()) - np.asarray(self.line_widget.GetPoint1())
-        
-        # defect spline skirt
-        if self.defect_spline_widget is not None:
-            defect_spline_polydata = pv.PolyData()
-            self.defect_spline_widget.GetPolyData(defect_spline_polydata)
-            self.defect_spline_skirt = defect_spline_polydata.extrude(vec_extrude)
-            
-            # shrink the lower part of the extrusion
-            # note that the upper part of spline skirt data is the same as spline data   
-            lower_polydata = self.defect_spline_skirt.points[len(defect_spline_polydata.points):]
-            vectors = np.asarray(self.line_widget.GetPoint2()) - lower_polydata
-            offset = self.extrude_shrink_ratio * vectors
-            updated_lower_polydata = lower_polydata + offset
-            self.defect_spline_skirt.points[len(defect_spline_polydata.points):] = updated_lower_polydata
-            
-            self.plotter.add_mesh(self.defect_spline_skirt, color='Red', name='defect_spline_skirt')
         
         # implant spline skirt
         if self.implant_spline_widget is not None:
@@ -274,12 +218,6 @@ class MainWidget(Qt.QWidget):
 
     def clip_mesh_by_spline_skirt(self):
         # Note: need to save then to read it again to make the surface manifold with all face normals consistent facing outward
-        self.defect_spline_skirt.fill_holes(100, inplace=True) # make the mesh closed
-        self.defect_spline_skirt.flip_normals()
-        self.defect_spline_skirt.save("temp_defect_spline_skirt.stl")
-        defect_spline_skirt = pv.read("temp_defect_spline_skirt.stl")
-        defect_spline_skirt.flip_normals()
-        
         self.implant_spline_skirt.fill_holes(100, inplace=True)
         self.implant_spline_skirt.flip_normals()
         self.implant_spline_skirt.save("temp_implant_spline_skirt.stl")
@@ -287,17 +225,9 @@ class MainWidget(Qt.QWidget):
         implant_spline_skirt.flip_normals()
         
         # note: boolean operation is very computational expensive
-        self.defect_skull_mesh = self.mesh.boolean_difference(defect_spline_skirt)
         self.implant_mesh = self.mesh.boolean_cut(implant_spline_skirt)
         
         # fix mesh manifold using pymeshfix
-        self.defect_skull_mesh.save("temp_defect_skull.stl")
-        defect_skull_mesh = pv.read("temp_defect_skull.stl")
-        meshfix = pymeshfix.MeshFix(defect_skull_mesh)
-        meshfix.repair(verbose= True, joincomp=True, remove_smallest_components=False)
-        self.defect_skull_mesh = meshfix.mesh
-        self.defect_skull_mesh.flip_normals()
-        
         self.implant_mesh.save("temp_implant.stl")
         implant_mesh = pv.read("temp_implant.stl")
         meshfix = pymeshfix.MeshFix(implant_mesh)
@@ -306,35 +236,21 @@ class MainWidget(Qt.QWidget):
         
         # update plot and remove generated temp files
         self.clear_all_widgets()
-        os.remove("temp_defect_spline_skirt.stl")
         os.remove("temp_implant_spline_skirt.stl")
-        os.remove("temp_defect_skull.stl")
         os.remove("temp_implant.stl")
+        self.plotter.add_mesh(self.implant_mesh, show_scalar_bar=False, name='mesh')
         
     def reset_spline_skirt_widget(self):
         self.clear_all_widgets()
-        self.spline_clip_button.setText("Add Spline")
+        self.spline_clip_button.setText("Create Spline")
         self.spline_clip_button.setEnabled(True)
         self.spline_resolution_spinbox.setEnabled(True)
         
-        self.defect_sphere_widgets = []
         self.implant_sphere_widgets = []
-        self.line_widget_point_2 = None
-        # determine whether keep the spline parameters
-        if self.spline_keep_checkbox.isChecked():
-            n_handles = self.defect_spline_widget.GetNumberOfHandles()
-            for i in range(n_handles):
-                sphere = pv.Sphere(radius=2, center=self.defect_spline_widget.GetHandlePosition(i))
-                self.defect_sphere_widgets.append(sphere)
-            n_handles = self.implant_spline_widget.GetNumberOfHandles()
-            for i in range(n_handles):
-                sphere = pv.Sphere(radius=2, center=self.implant_spline_widget.GetHandlePosition(i))
-                self.implant_sphere_widgets.append(sphere)
-            self.line_widget_point_2 = np.asarray(self.line_widget.GetPoint2())
-        self.defect_spline_widget = None
         self.implant_spline_widget = None
+        self.implant_spline_skirt = None
+        self.line_widget_point_2 = None
         self.line_widget = None
-        self.defect_spline_skirt = None
         
     def clear_all_widgets(self):
         self.plotter.clear()
