@@ -213,7 +213,7 @@ class MainWindow(Qt.QMainWindow):
         pv.save_meshio(f_name, self.mesh, file_format=f_filter.strip('(*.)'))
     
     def save_contour_csv(self):
-        f_name, f_extension = Qt.QFileDialog.getSaveFileName(self, 'Save contour fit curve', self.fname.strip(self.fname.split('/')[-1]), "(*.csv) ;; (*.txt)")
+        f_name, f_extension = Qt.QFileDialog.getSaveFileName(self, 'Save contour fit curve', '', "(*.csv) ;; (*.txt)")
         f_extension = f_extension.strip('(*.)')
         if f_extension == 'csv':
             np.savetxt(f_name, self.spline_curve_fit.points)
@@ -221,7 +221,7 @@ class MainWindow(Qt.QMainWindow):
             print("Save as \.txt has not been implemented")   
         
     def save_toolpath(self):
-        f_name, f_extension = Qt.QFileDialog.getSaveFileName(self, 'Save generated toolpath', self.fname.strip(self.fname.split('/')[-1]), "(*.csv) ;; (*.txt)")
+        f_name, f_extension = Qt.QFileDialog.getSaveFileName(self, 'Save generated toolpath', '', "(*.csv) ;; (*.txt)")
         f_extension = f_extension.strip('(*.)')
         if f_extension == 'csv':
             np.savetxt(f_name, self.toolpath)
@@ -430,8 +430,8 @@ class MainWindow(Qt.QMainWindow):
                 ** NOTE: watch out wrong vertices_candidate where vertices are at around 180 degree apart
                 ** TODO: add assertion where no vertexc is within distance threshold
                 4. fit a plane to vertices_candidate, plane_3
-                5. cutting vector = normal of plane_2 x normal of plane_3 (might be flipped)
-                #Alternative: cutting vector = tangent vector of point x normal of plane_3 (might be flipped)
+                5. cutting vector = tangent vector of point x normal of plane_3 (might be flipped)
+                #. Alternative: cutting vector = normal of plane_2 x normal of plane_3 (might be flipped)
         """
         print("generating vector tools with defect wall ...")
         if self.projection_plane is None:
@@ -442,10 +442,13 @@ class MainWindow(Qt.QMainWindow):
         vectors = self.spline_curve_fit.points - self.spline_curve_fit.center
         distance_threshold = self.doubleSpinBox_distance_threshold.value()
         for vector_id, point, vector in zip(np.arange(len(vectors)), self.spline_curve_fit.points, vectors):
-            # next_point_id = vector_id + 1
-            # if next_point_id == len(vectors):
-            #     next_point_id = 1 # first point and last point are the same
-            # tangent = self.spline_curve_fit.points[next_point_id] - point
+
+            # for tangent vector
+            next_point_id = vector_id + 1
+            if next_point_id == len(vectors):
+                next_point_id = 1 # first point and last point are the same
+            tangent = self.spline_curve_fit.points[next_point_id] - point
+
             normal_2 = np.cross(self.projection_plane.plane_normal, vector)
             plane_2 = pv.Plane(point, normal_2, 100, 100, 1, 1) # NOTE: the plane has to be large enough for correct implicit distance
             self.mesh_defect_wall.compute_implicit_distance(plane_2, inplace=True) # Signed distance
@@ -463,17 +466,21 @@ class MainWindow(Qt.QMainWindow):
                 vectors_tool.append([0,0,1])
                 continue
 
-            # self.plotter.add_points(point, style='points', color='Green', point_size=20.0, name='point')
-            # self.plotter.add_points(vertices_candidate, style='points', color='Black', point_size=20.0, name='candidate')
+            # visualization for candidate vertices on the defect wall to fit a plane 
+            self.plotter.add_points(point, style='points', color='Green', point_size=20.0, name='point')
+            self.plotter.add_points(vertices_candidate, style='points', color='Black', point_size=20.0, name='candidate')
 
             # fit plane to candidate vertices and compute vector tool
             plane_3, center_3, normal_3 = pv.fit_plane_to_points(vertices_candidate, return_meta=True)
             # check normal_3 direction
             if np.dot(normal_3, vector) < 0:
                 normal_3 = -normal_3
-            vector_tool = np.cross(normal_2, normal_3)
-            # vector_tool = np.cross(tangent, normal_3)
+            # vector_tool = np.cross(normal_2, normal_3)
+            vector_tool = np.cross(tangent, normal_3) # for tangent vector
             vectors_tool.append(vector_tool)
+        
+        self.plotter.remove_actor('point')
+        self.plotter.remove_actor('candidate')
 
         vectors_tool = np.array(vectors_tool)
         lengths_vectors_tool = np.linalg.norm(vectors_tool, axis=1).reshape((-1,1))
@@ -497,7 +504,6 @@ class MainWindow(Qt.QMainWindow):
                 # update vector
                 vectors_tool[invalid_id] = vector_interpolated
 
-        # self.plotter.add_arrows(self.spline_curve_fit.points, vectors_tool, mag=3, color='Blue', name='TCP_axis')
         return vectors_tool
 
     def generate_toolpath(self):
@@ -529,7 +535,7 @@ class MainWindow(Qt.QMainWindow):
         vectors_new_tangential = np.array(vectors_new_tangential)
         vectors_new = vectors_new_tangential + vectors_along_plane_noraml
 
-        # # FLIP plane normal is NOT USED!!!!!!!!1
+        # # FLIP plane normal is NOT USED!!!!!!!!
         # # **Flip plane normal each time this function is called**
         # self.projection_plane.plane_normal = -self.projection_plane.plane_normal
         vectors_new = vectors_new - np.cos(alpha) * self.projection_plane.plane_normal
