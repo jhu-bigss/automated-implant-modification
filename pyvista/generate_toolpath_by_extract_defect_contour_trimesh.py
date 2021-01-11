@@ -1,7 +1,9 @@
 import sys, os, vtk
+from functools import reduce
 
 import pyvista as pv
 import numpy as np
+import trimesh
 
 from PyQt5 import Qt, QtCore, uic
 from pyvistaqt import QtInteractor
@@ -47,9 +49,8 @@ class MainWindow(Qt.QMainWindow):
         self.pushButton_generate_toolpath.clicked.connect(self.generate_toolpath)
         self.pushButton_save_contour.clicked.connect(self.save_contour_csv)
         self.pushButton_load_contour.clicked.connect(self.load_contour_csv_event)
+        self.pushButton_load_trimesh.clicked.connect(self.load_trimesh)
         self.pushButton_save_toolpath.clicked.connect(self.save_toolpath)
-        self.pushButton_load_defect_wall.clicked.connect(self.load_defect_wall)
-        # self.pushButton_dummy.clicked.connect(self.dummy)
         
         # statusbar setting
         self.pushButton_implant_mesh = Qt.QPushButton("Load Implant")
@@ -71,11 +72,21 @@ class MainWindow(Qt.QMainWindow):
         self.mesh_rgb = True
         self.mesh_extracted = None
         self.mesh_implant = None
-        self.mesh_defect_wall = None
+        self.mesh_defect_trimesh = None
         self.cell_picking_enabled = False
         self.projection_plane = None
         self.spline_widget = None
-        self.toolpath = None
+
+        # # debug: load mesh directly
+        # self.fname = "../data/3-1 Defect_registered.stl"
+        # self.load_mesh()
+
+        # # debug: load contour directly
+        # self.fname = "../data/test.csv"
+        # self.load_contour_csv(self.fname)
+        # fname = "../data/3-1 Defect_registered.stl"
+        # self.mesh_defect = pv.read(fname)
+        # self.mesh_defect_trimesh = trimesh.load(fname)
 
         if show:
             self.show()
@@ -114,13 +125,20 @@ class MainWindow(Qt.QMainWindow):
         else:
             e.ignore()
 
+    def load_trimesh(self):
+        self.fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open file','',"(*.stl) ;; (*.ply)")
+        if self.fname != "":
+            self.mesh_defect_trimesh = trimesh.load(self.fname)
+            self.mesh = pv.read(self.fname)
+
     def load_mesh_event(self):
         """
         Open a mesh file
         """
         self.fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open file','',"(*.ply) ;; (*.stl)")
-        if self.fname != '':
+        if self.fname != "":
             self.load_mesh()
+            self.mesh_defect_trimesh = trimesh.load(self.fname)
 
     def load_mesh(self):
         self.mesh = pv.read(self.fname)
@@ -146,7 +164,7 @@ class MainWindow(Qt.QMainWindow):
             self.statusbar.addWidget(self.slider_opacity_defect)
         else:
             fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open file', '',"(*.stl) ;; (*.ply)")
-        if fname != '':
+        if fname != "":
             self.mesh_implant = pv.read(fname)
             
             label_visibility = Qt.QLabel(" Show ")
@@ -163,18 +181,6 @@ class MainWindow(Qt.QMainWindow):
             self.slider_opacity_implant.setValue(100)
             self.slider_opacity_implant.valueChanged.connect(self.show_impant)
             self.statusbar.addWidget(self.slider_opacity_implant)
-
-    def load_defect_wall(self):
-        """
-        Open a defect wall file
-        """
-        file_dir = ''
-        if self.fname is not None:
-            file_dir = self.fname.strip(self.fname.split('/')[-1])
-
-        fname, _ = Qt.QFileDialog.getOpenFileName(self, 'Open file', '',"(*.ply) ;; (*.stl)")
-        if fname != '':
-            self.mesh_defect_wall = pv.read(fname)
         
     def load_contour_csv_event(self):
         """
@@ -374,6 +380,7 @@ class MainWindow(Qt.QMainWindow):
         radius_uniform = func(angles_uniform, *ans_theta)
         h_uniform = func(angles_uniform, *ans_h)
         curve_parameterized = np.column_stack((angles_uniform, radius_uniform, h_uniform))
+
         if self.checkBox_visulize_on_plane.isChecked():
             center = self.projection_plane.points_projected.center
             wrap_factor = 20 # wrap the data around to make it looks smooth
@@ -390,7 +397,7 @@ class MainWindow(Qt.QMainWindow):
             if self.spline_widget is not None:
                 self.plotter.clear_spline_widgets()
                 self.spline_widget = None
-            self.plotter.add_spline_widget(self.spline_widget_callback, n_hanldes=len(self.curve_points), resolution=self.spinBox_spline_resolution.value(), pass_widget=True)
+            self.plotter.add_spline_widget(self.spline_widget_callback, n_handles=len(self.curve_points), resolution=self.spinBox_spline_resolution.value(), pass_widget=True)
         
         # remove mesh extracted
         self.plotter.remove_actor('mesh')
@@ -417,102 +424,13 @@ class MainWindow(Qt.QMainWindow):
                     handle_position = mesh.points[mesh.find_closest_point(widget.GetHandlePosition(i))]
                     widget.SetHandlePosition(i, *handle_position)
 
-    def generate_vector_tool_with_defect_wall(self):
-        """
-            define variables
-            # best fit plane to spline_curve_fit, plane_1 (self.projection_plane)
-            # center of spline_curve_fit, O
-            # distance threshold, d_threshold
-            For point (p) in spline_curve_fit.points:
-                1. construct a plane (plane_2) by normal of plane_1 and the vector (O to p)
-                2. compute distance to plance_2 for all vertices in the defect wall
-                3. find vertices in defect wall that are within distance threshold, vertices_candidate
-                ** NOTE: watch out wrong vertices_candidate where vertices are at around 180 degree apart
-                ** TODO: add assertion where no vertexc is within distance threshold
-                4. fit a plane to vertices_candidate, plane_3
-                5. cutting vector = normal of plane_2 x normal of plane_3 (might be flipped)
-                #Alternative: cutting vector = tangent vector of point x normal of plane_3 (might be flipped)
-        """
-        print("generating vector tools with defect wall ...")
-        if self.projection_plane is None:
-            self.project_vertices_to_plane(self.spline_curve_fit)
-
-        vectors_tool = []
-        invalid_vector_ids = []
-        vectors = self.spline_curve_fit.points - self.spline_curve_fit.center
-        distance_threshold = self.doubleSpinBox_distance_threshold.value()
-        for vector_id, point, vector in zip(np.arange(len(vectors)), self.spline_curve_fit.points, vectors):
-            # next_point_id = vector_id + 1
-            # if next_point_id == len(vectors):
-            #     next_point_id = 1 # first point and last point are the same
-            # tangent = self.spline_curve_fit.points[next_point_id] - point
-            normal_2 = np.cross(self.projection_plane.plane_normal, vector)
-            plane_2 = pv.Plane(point, normal_2, 100, 100, 1, 1) # NOTE: the plane has to be large enough for correct implicit distance
-            self.mesh_defect_wall.compute_implicit_distance(plane_2, inplace=True) # Signed distance
-            distances_vertex_to_plane = np.absolute(self.mesh_defect_wall['implicit_distance'])
-            vertices_candidate = self.mesh_defect_wall.points[np.where(distances_vertex_to_plane < distance_threshold)]
-                
-            # filter out incorrect candidates
-            vectors_center_to_candidate = vertices_candidate - self.spline_curve_fit.center
-            dot_product = np.matmul(vectors_center_to_candidate, vector.reshape((3,1)))
-            vertices_candidate = vertices_candidate[np.where(dot_product > 0)[0]]
-
-            # Handle exception where too few candidates were extracted, record the vector id and interpolate for the vector in the next step 
-            if len(vertices_candidate) < 3:
-                invalid_vector_ids.append(vector_id)
-                vectors_tool.append([0,0,1])
-                continue
-
-            # self.plotter.add_points(point, style='points', color='Green', point_size=20.0, name='point')
-            # self.plotter.add_points(vertices_candidate, style='points', color='Black', point_size=20.0, name='candidate')
-
-            # fit plane to candidate vertices and compute vector tool
-            plane_3, center_3, normal_3 = pv.fit_plane_to_points(vertices_candidate, return_meta=True)
-            # check normal_3 direction
-            if np.dot(normal_3, vector) < 0:
-                normal_3 = -normal_3
-            vector_tool = np.cross(normal_2, normal_3)
-            # vector_tool = np.cross(tangent, normal_3)
-            vectors_tool.append(vector_tool)
-
-        vectors_tool = np.array(vectors_tool)
-        lengths_vectors_tool = np.linalg.norm(vectors_tool, axis=1).reshape((-1,1))
-        lengths_vectors_tool = np.repeat(lengths_vectors_tool, 3, axis=1)
-        vectors_tool = vectors_tool / lengths_vectors_tool
-
-        if len(invalid_vector_ids) > 0:
-            print("invalid vectors found")
-            print(invalid_vector_ids)
-            # find the neighboring and valid vectors, interpolate for invalid vectors_tool
-            valid_vector_ids = np.setdiff1d(np.arange(len(vectors_tool)), invalid_vector_ids)
-            insertion_vector_ids = np.searchsorted(valid_vector_ids, invalid_vector_ids) # Binary search to find the insertion position
-            for invalid_id, insertion_id in zip(invalid_vector_ids, insertion_vector_ids):
-                if insertion_id == len(valid_vector_ids):
-                    next_id = valid_vector_ids[0]
-                else:
-                    next_id = valid_vector_ids[insertion_id]
-                prev_id = valid_vector_ids[insertion_id - 1]
-                vector_interpolated = (invalid_id - prev_id) * vectors_tool[prev_id] + (next_id - invalid_id) * vectors_tool[next_id]
-                vector_interpolated = vector_interpolated / (next_id - prev_id)
-                # update vector
-                vectors_tool[invalid_id] = vector_interpolated
-
-        # self.plotter.add_arrows(self.spline_curve_fit.points, vectors_tool, mag=3, color='Blue', name='TCP_axis')
-        return vectors_tool
-
     def generate_toolpath(self):
-        if self.toolpath is not None:
-            # flip vector tool
-            self.toolpath[:,3:] = -self.toolpath[:,3:]
-            self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
-            self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='Blue', name='TCP_axis')
-            return
-
+        print("Generating toolpath")
         # d is the diameter of the cutter tool; alpha is the tool tilt-in angle
         d = self.doubleSpinBox_tool_diameter.value()
         r = d/2
         alpha = self.doubleSpinBox_tilt_angle.value() * np.pi / 180
-
+        
         ## vector part ## - we need another set of "shrinked" vectors to generate cut vector
         # 1. generate a series of vectors pointing outward from the center
         vectors = self.spline_curve_fit.points - self.spline_curve_fit.center
@@ -529,28 +447,136 @@ class MainWindow(Qt.QMainWindow):
         vectors_new_tangential = np.array(vectors_new_tangential)
         vectors_new = vectors_new_tangential + vectors_along_plane_noraml
 
-        # # FLIP plane normal is NOT USED!!!!!!!!1
-        # # **Flip plane normal each time this function is called**
-        # self.projection_plane.plane_normal = -self.projection_plane.plane_normal
+        # **Flip plane normal each time this function is called**
+        self.projection_plane.plane_normal = -self.projection_plane.plane_normal
         vectors_new = vectors_new - np.cos(alpha) * self.projection_plane.plane_normal
+        vectors_tool = vectors_new - vectors
 
-        if self.mesh_defect_wall:
-            vectors_tool = self.generate_vector_tool_with_defect_wall()
-        else:
-            vectors_tool = vectors_new - vectors
-        
-        ## point part ## - to consider tool diameter compensation
-        # 1. distribute the tooltip offset displacement along tangential
-        vectors_tangential_offset = []
-        for vec in vectors_along_plane_tangential:
-            vectors_tangential_offset.append(r * np.cos(alpha) * vec / np.linalg.norm(vec))
-        vectors_tangential_offset = np.array(vectors_tangential_offset)
-        points_tool = self.spline_curve_fit.points + vectors_tangential_offset
-        
+        # visualize the result
+        points_tool = self.spline_curve_fit.points
         self.toolpath = np.column_stack((points_tool, vectors_tool))
-        self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
-        self.plotter.add_arrows(self.toolpath[:,:3], self.toolpath[:,3:], mag=3, color='BLUE', name='TCP_axis')
-        # self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis') # USED in ICRA
+        # self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
+        # self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis_neg') # the one used before
+        self.plotter.add_arrows(self.toolpath[:,:3], self.toolpath[:,3:], mag=3, color='green', name='TCP_axis_pos')
+
+        # 4. adjust the vectors to fit the defect wall
+            # a) find tool_vector_first and tool_vector_second defined in GUI: the origin points for ray casting
+            # b) perform ray-casting and define the new vector tool
+        points_vector_tool_first = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_first.value()
+        points_vector_tool_second = points_tool + vectors_tool * self.doubleSpinBox_tool_vector_second.value()
+        # self.plotter.add_points(points_vector_tool_first, style='points', color='Red', point_size=20.0, name='first')
+        # self.plotter.add_points(points_vector_tool_second, style='points', color='Green', point_size=20.0, name='seconds')
+
+        if self.mesh_defect_trimesh is None:
+            print("Trimesh is not loaded")
+            return
+
+        else:
+            # NOTE: the returned idr is the array of ray indices for intersects_location()
+            locations_first, idr_first, idt_first = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_first, -vectors_along_plane_tangential, multiple_hits=False)
+            locations_second, idr_second, idt_second = self.mesh_defect_trimesh.ray.intersects_location(points_vector_tool_second, -vectors_along_plane_tangential, multiple_hits=False)
+            idr_first_sorted = np.sort(idr_first)
+            idr_second_sorted = np.sort(idr_second)
+            idr_first_argsorted = np.argsort(idr_first)
+            idr_second_argsorted = np.argsort(idr_second)
+
+            # Update vectors_new with valid vectors from ray-casting and get indices for invalid ones
+            # NOTE: take care of the cases when ray casting fails
+            # (1) no intersections
+            # (2) length of the ray is too long
+            # (3) length of the new vector is too long
+
+            invalid_ids = None
+
+            if len(locations_first) < len(vectors_tool)//2 or len(locations_second) < len(vectors_tool)//2:
+                print("Ray casting fails! Num of intersection is less than half of the number of the vectors.")
+                return
+
+            # check if number of intersections match:
+            if len(locations_first) == len(locations_second):
+                print("number of intersections: " + str(len(locations_first)))
+                vectors_new = locations_second[idr_second_argsorted] - locations_first[idr_first_argsorted]
+            else:
+                print("shape does not match:")
+                print("number of intersections from first points: " + str(len(locations_first)))
+                print("number of intersections from second points: " + str(len(locations_second)))
+                # get successful ray casting (ray casting has intersections for both the first point and the second point)
+                idr_valid = np.intersect1d(idr_first, idr_second) # ordered
+                invalid_ids = np.setdiff1d(np.arange(len(vectors_new)),idr_valid)
+                idr_first_valid_index = idr_first_argsorted[np.searchsorted(idr_first, idr_valid, sorter=idr_first_argsorted)]
+                idr_second_valid_index = idr_second_argsorted[np.searchsorted(idr_second, idr_valid, sorter=idr_second_argsorted)]
+                vectors_success = locations_second[idr_second_valid_index] - locations_first[idr_first_valid_index]
+                # replace original vectors by successful ray casting
+                vectors_new[idr_valid] = vectors_success
+
+            # CASE: the length of vectors_new is too large
+            lengths_vectors_new = np.linalg.norm(vectors_new, axis = 1)
+            length_threshold = 2 * (self.doubleSpinBox_tool_vector_second.value() - self.doubleSpinBox_tool_vector_first.value()) # deubg
+            incorrect_vectors_new_lengths = np.where(lengths_vectors_new > length_threshold)[0]
+            if invalid_ids is None:
+                invalid_ids = incorrect_vectors_new_lengths
+            else:
+                invalid_ids = np.union1d(invalid_ids, incorrect_vectors_new_lengths)
+
+            # CASE: the length of ray is too large
+            lengths_ray_first = np.linalg.norm(locations_first[idr_first_argsorted] - points_vector_tool_first[idr_first_sorted], axis=1)
+            lengths_ray_second = np.linalg.norm(locations_second[idr_second_argsorted] - points_vector_tool_second[idr_second_sorted], axis=1)
+            incorrect_ray_lengths_first = idr_first_sorted[np.where(lengths_ray_first > length_threshold)[0]]
+            incorrect_ray_lengths_second = idr_second_sorted[np.where(lengths_ray_second > length_threshold)[0]]
+            if invalid_ids is None:
+                invalid_ids = np.union1d(incorrect_ray_lengths_first, incorrect_ray_lengths_second)
+            else:
+                invalid_ids = reduce(np.union1d, (invalid_ids,\
+                    incorrect_ray_lengths_first, incorrect_ray_lengths_second))
+
+            # normalize vectors
+            lengths_vectors_new = lengths_vectors_new.reshape((-1,1))
+            lengths_vectors_new = np.repeat(lengths_vectors_new, 3, axis=1)
+            vectors_new = vectors_new / lengths_vectors_new
+
+            # # visualize valid and invalid vectors 
+            # vectors_valid = vectors_new[valid_ids]
+            # vectors_invalid = vectors_new[invalid_ids]
+            # self.plotter.add_arrows(self.toolpath[valid_ids , :3], vectors_valid, mag=3, color='blue', name='TCP_axis_valid')
+            # if len(invalid_ids) > 0:
+            #     self.plotter.add_arrows(self.toolpath[invalid_ids , :3], vectors_invalid, mag=3, color='red', name='TCP_axis_invalid')
+
+            # find the neighboring and valid vectors, interpolate for invalid vectors_new
+            valid_ids = np.setdiff1d(np.arange(len(vectors_new)), invalid_ids)
+            insertion_ids = np.searchsorted(valid_ids, invalid_ids) # Binary search to find the insertion position
+            for invalid_id, insertion_id in zip(invalid_ids, insertion_ids):
+                if insertion_id == len(valid_ids):
+                    next_id = valid_ids[0]
+                else:
+                    next_id = valid_ids[insertion_id]
+                prev_id = valid_ids[insertion_id - 1]
+                vector_interpolated = (invalid_id - prev_id) * vectors_new[prev_id] + (next_id - invalid_id) * vectors_new[next_id]
+                vector_interpolated = vector_interpolated / (next_id - prev_id)
+                # update vector
+                vectors_new[invalid_id] = vector_interpolated
+            self.plotter.add_arrows(self.toolpath[:, :3], vectors_new, mag=3, color='blue', name='TCP_axis_final')
+
+            # # closest points
+            # closest_pts = []
+            # for point in points_seconds:
+            #     closest_pt_id = self.mesh_implant.find_closest_point(point)
+            #     closest_pt = self.mesh_implant.points[closest_pt_id]
+            #     closest_pts.append(closest_pt)
+            # closest_pts = np.array(closest_pts)
+
+        # ## point part ## - to consider tool diameter compensation
+        # # 1. distribute the tooltip offset displacement along tangential
+        # vectors_tangential_offset = []
+        # for vec in vectors_along_plane_tangential:
+        #     vectors_tangential_offset.append(r * np.cos(alpha) * vec / np.linalg.norm(vec))
+        # vectors_tangential_offset = np.array(vectors_tangential_offset)
+        # points_tool = self.spline_curve_fit.points + vectors_tangential_offset
+        
+        # self.toolpath = np.column_stack((points_tool, vectors_tool))
+        # self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
+        # self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='White', name='TCP_axis')
+
+        print("Finished toolpath generation")
 
     @staticmethod
     def poly12(x, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12):
@@ -599,19 +625,6 @@ class MainWindow(Qt.QMainWindow):
         points_3d = center + np.matmul(points_local, axes.T)
         
         return points_3d
-
-    # # NOT USED
-    # def project_to_implant(self):
-
-    #     # self.plotter.add_mesh(self.spline_curve_fit.points, style='points', color='Red', point_size=20.0, name='fitted')
-
-    #     closest_pts = []
-    #     for point in self.spline_curve_fit.points:
-    #         closest_pt_id = self.mesh_implant.find_closest_point(point)
-    #         closest_pt = self.mesh_implant.points[closest_pt_id]
-    #         closest_pts.append(closest_pt)
-    #     closest_pts = np.array(closest_pts)
-    #     self.plotter.add_points(closest_pts, style='points', color='Black', point_size=20.0, name='closest')
 
 if __name__ == '__main__':
     app = Qt.QApplication(sys.argv)
