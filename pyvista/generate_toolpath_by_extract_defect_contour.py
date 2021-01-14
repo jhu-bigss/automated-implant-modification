@@ -386,35 +386,26 @@ class MainWindow(Qt.QMainWindow):
         else:
             center = self.mesh_extracted.center
             self.curve_points = self.polar_to_cartesian(curve_parameterized, center, self.projection_plane.axes)
+            self.curve_points = np.append(self.curve_points, [self.curve_points[0]], axis=0) # append the 1st element to last
             # 3. convert the fit curve points into a spline widget
             if self.spline_widget is not None:
                 self.plotter.clear_spline_widgets()
                 self.spline_widget = None
-            self.plotter.add_spline_widget(self.spline_widget_callback, n_hanldes=len(self.curve_points), resolution=self.spinBox_spline_resolution.value(), pass_widget=True)
+            self.plotter.add_spline_widget(self.spline_widget_callback, n_handles=len(self.curve_points), resolution=self.spinBox_spline_resolution.value(), closed=True, pass_widget=True, initial_points=self.curve_points)
         
         # remove mesh extracted
         self.plotter.remove_actor('mesh')
         
     def spline_widget_callback(self, spline_polydata, widget):
-        self.spline_curve_fit = spline_polydata
-        n_handles = widget.GetNumberOfHandles()
-        if self.spline_widget is None:
-            self.parametric_spline = vtk.vtkParametricSpline()
-            widget.SetParametricSpline(self.parametric_spline)
-            self.parametric_spline.SetPoints(pv.vtk_points(self.curve_points))
-            self.parametric_spline.SetClosed(True)
-            for i in range(n_handles):
-                widget.SetHandlePosition(i, *self.curve_points[i])
-            self.spline_widget = widget
-        else:
-            # ensure handle points on mesh surface is snap is turned ON
-            if self.checkBox_snap_on.isChecked():
-                for i in range(n_handles):
-                    if self.mesh_implant is None:
-                        mesh = self.mesh
-                    else:
-                        mesh = self.mesh_implant
-                    handle_position = mesh.points[mesh.find_closest_point(widget.GetHandlePosition(i))]
+        # Since Pyvista 0.27.4, it changed spline_polydata's source to vtkParametricFunctionSource instead of getting polydata directly from widget
+        # Add following two lines to make it same as older versions
+        self.spline_curve_fit = pv.PolyData()
+        widget.GetPolyData(self.spline_curve_fit)
+        # ensure handle points on mesh surface is snap is turned ON
+        if self.checkBox_snap_on.isChecked():
+            if self.mesh_implant is not None:
+                for i in range(len(self.curve_points)):
+                    handle_position = self.mesh_implant.points[self.mesh_implant.find_closest_point(widget.GetHandlePosition(i))]
                     widget.SetHandlePosition(i, *handle_position)
 
     def generate_vector_tool_with_defect_wall(self):
