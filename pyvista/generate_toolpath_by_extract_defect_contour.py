@@ -49,7 +49,7 @@ class MainWindow(Qt.QMainWindow):
         self.pushButton_load_contour.clicked.connect(self.load_contour_csv_event)
         self.pushButton_save_toolpath.clicked.connect(self.save_toolpath)
         self.pushButton_load_defect_wall.clicked.connect(self.load_defect_wall)
-        # self.pushButton_dummy.clicked.connect(self.dummy)
+        self.pushButton_flip_tool_vector.clicked.connect(self.flip_tool_vector)
         
         # statusbar setting
         self.pushButton_implant_mesh = Qt.QPushButton("Load Implant")
@@ -497,13 +497,17 @@ class MainWindow(Qt.QMainWindow):
 
         return vectors_tool
 
-    def generate_toolpath(self):
+    def flip_tool_vector(self):
+
         if self.toolpath is not None:
             # flip vector tool
             self.toolpath[:,3:] = -self.toolpath[:,3:]
             self.plotter.add_lines(self.toolpath[:,:3], color='White', name='TCP_pts')
-            self.plotter.add_arrows(self.toolpath[:,:3], -self.toolpath[:,3:], mag=3, color='Blue', name='TCP_axis')
-            return
+            self.plotter.add_arrows(self.toolpath[:,:3], self.toolpath[:,3:], mag=3, color='Blue', name='TCP_axis')
+        else:
+            print("Tool path is not created yet.")
+
+    def generate_toolpath(self):
 
         # d is the diameter of the cutter tool; alpha is the tool tilt-in angle
         d = self.doubleSpinBox_tool_diameter.value()
