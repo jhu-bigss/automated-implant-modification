@@ -63,7 +63,7 @@ class ChessBoard:
         print('Do you want to save the new result of camera calibration?(y/n)')
         cam_param_save_flag = input()
         if cam_param_save_flag == 'y':
-            calib_file = cv2.FileStorage("camera_params_handeye.yaml", cv2.FILE_STORAGE_WRITE)
+            calib_file = cv2.FileStorage("camera_params.yaml", cv2.FILE_STORAGE_WRITE)
             calib_file.write("intrinsic",mtx)
             calib_file.write("dist_coeff", dist)
             calib_file.release()
@@ -82,7 +82,7 @@ class ChessBoard:
         ref_pts = np.zeros((3, 1))
 
         # Load camera calibration
-        calib_file = os.getcwd() + '/camera_params.yaml'
+        calib_file = os.getcwd() + '/camera_params_handeye.yaml'
         calib_file = cv2.FileStorage(calib_file, cv2.FILE_STORAGE_READ)
         mtx = calib_file.getNode("intrinsic").mat()
         dist = calib_file.getNode("dist_coeff").mat()

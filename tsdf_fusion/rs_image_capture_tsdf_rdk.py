@@ -13,9 +13,9 @@ from utils.rdkthread import RoboDK
 from utils import fusion
 
 data_foler = 'data/'
-vol_origion_wrt_robot_base = [773, 0, 415] # mm
+vol_origion_wrt_robot_base = [600, 0, 415] # mm
 vol_default_width = 240
-vol_default_height = 70
+vol_default_height = 40
 vol_default_resolution = 1
 
 class MainWidget(Qt.QWidget):
@@ -81,14 +81,14 @@ class MainWidget(Qt.QWidget):
         self.vol_origin_z.setValue(vol_origion_wrt_robot_base[2])
         self.vol_truncate_margin = Qt.QDoubleSpinBox()
         self.vol_truncate_margin.setMaximum(100)
-        self.vol_truncate_margin.setValue(3)
+        self.vol_truncate_margin.setValue(5)
         self.run_tsdf_button = Qt.QPushButton("Run TSDF")
         self.scan_circle_height = Qt.QDoubleSpinBox()
         self.scan_circle_height.setMaximum(500)
         self.scan_circle_height.setValue(300)
         self.scan_circle_radius = Qt.QDoubleSpinBox()
         self.scan_circle_radius.setMaximum(100)
-        self.scan_circle_radius.setValue(50)
+        self.scan_circle_radius.setValue(100)
         self.scan_num_of_circular_poses = Qt.QSpinBox()
         self.scan_num_of_circular_poses.setMaximum(99)
         self.scan_num_of_circular_poses.setValue(10)
