@@ -7,6 +7,7 @@ import cv2
 import os
 import datetime
 
+# 1920x1080 for handeye calibration; 640x480 for tsdf fusion
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
 
@@ -25,7 +26,6 @@ def create_image_directory():
 # Configure depth and color streams
 pipeline = rs.pipeline()
 config = rs.config()
-config.enable_stream(rs.stream.depth, IMAGE_WIDTH, IMAGE_HEIGHT, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, IMAGE_WIDTH, IMAGE_HEIGHT, rs.format.bgr8, 30)
 
 # Start streaming

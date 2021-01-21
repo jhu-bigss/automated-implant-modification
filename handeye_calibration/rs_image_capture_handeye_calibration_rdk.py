@@ -36,7 +36,7 @@ class MainWidget(Qt.QWidget):
 
         # create a label to display camera image
         self.cv_label = Qt.QLabel()
-        cv_thread = CameraThread(self, 640, 480)
+        cv_thread = CameraThread(self, 1920, 1080, 30)
         cv_thread.change_pixmap.connect(self.set_image)
         cv_thread.start()
         self.data_directory = self.create_data_directory(os.path.dirname(os.path.realpath(__file__)))
@@ -150,7 +150,7 @@ class MainWidget(Qt.QWidget):
 
         # Load data
         T_robot = load_data.read_robot_pose_from_dir(self.data_directory)
-        T_eye = load_data.read_chessboard_image_from_dir(self.data_directory)
+        T_eye = load_data.read_chessboard_image_from_dir(self.data_directory, 1920, 1080, 7, 6, 30)
         num_of_poses = len(T_eye)
         if num_of_poses != len(T_robot):
             print("WARNING: load robot poses not equal to the number of images.")

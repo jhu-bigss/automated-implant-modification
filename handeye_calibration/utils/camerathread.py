@@ -11,7 +11,7 @@ class CameraThread(QtCore.QThread):
 
     change_pixmap = QtCore.pyqtSignal(Qt.QImage)
 
-    def __init__(self, parent=None, width=1280, height=720, fps=30):
+    def __init__(self, parent=None, width=1920, height=1080, fps=30):
         super().__init__()
         
         # Declare RealSense pipelineline 
@@ -22,7 +22,7 @@ class CameraThread(QtCore.QThread):
         # start streaming
         self.pipeline.start(config)
         self.running = True
-        print("start realsense!")
+        print("start realsense with %d x %d at %d Hz" % (width, height, fps) )
         
         parent.image_captured.connect(self.save_image)
         parent.window_closed.connect(self.stop)
