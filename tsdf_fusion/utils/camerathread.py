@@ -46,7 +46,7 @@ class CameraRealsense(QtCore.QThread):
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
-        self.depth_scale = depth_sensor.get_depth_scale()
+        self.depth_scale = depth_sensor.get_depth_scale() * 1.017 # Correct depth scale
         # print("Depth Scale is: " , self.depth_scale)
 
         # Create an align object
