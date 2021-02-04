@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+plt.rcParams.update({'font.size': 24})
+
 # Define labels, positions, bar heights and error bar heights
 exp_name = ['Conventional', '3D-Scanning']
 labels = ['Specimen1', 'Specimen2']
@@ -58,7 +60,9 @@ def contour_based_errors():
     ax.set_xticklabels(labels)
     ax.set_title('Contour-based evaluation for final outcome')
     ax.yaxis.grid(True)
-    ax.legend()
+    # ax.legend(bbox_to_anchor=(0.5, 0.5), loc='upper right')
+    # ax.legend(loc="upper center")
+    # plt.legend(loc="upper center"")
 
     # Save the figure and show
     plt.tight_layout()
@@ -174,7 +178,7 @@ def defect_wall_errors():
             capsize=10,
             label=exp_name[i])
 
-        # ax.scatter(x_pos + 0.2*i, max_list[i], color="0", alpha=.35)
+        ax.scatter(x_pos + 0.2*i, max_list[i], color="0", alpha=.35)
 
         
         # ha = {'center': 'center', 'right': 'left', 'left': 'right'}
@@ -198,7 +202,8 @@ def defect_wall_errors():
     ax.set_xticklabels(labels)
     # ax.set_title('Contour-based evaluation for final outcome')
     ax.yaxis.grid(True)
-    ax.legend()
+    # ax.legend()
+    ax.legend(loc='upper center')
 
     # Save the figure and show
     plt.tight_layout()
