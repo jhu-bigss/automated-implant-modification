@@ -1,0 +1,252 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define labels, positions, bar heights and error bar heights
+exp_name = ['Conventional', '3D-Scanning']
+labels = ['Specimen1', 'Specimen2']
+
+def contour_based_errors():
+    chad_means = [1.18, 4.4, 3.45, 2.51, 3.1, 3.13]
+    p4_means = [1.24, 1.91, 2.47, 1.29, 0.78, 1.34]
+    pv_means = [0.84, 1.26, 1.2, 0.94, 1.01, 0.84]
+    mean_list = [chad_means, p4_means, pv_means]
+
+    chad_stds = [1.91, 4.65, 3.71, 2.51, 3.3, 3.33]
+    p4_stds = [1.54, 2.26, 2.86, 1.61, 0.93, 1.69]
+    pv_stds = [0.98, 1.34, 1.47, 1.08, 1.1, 0.96]
+    std_list = [chad_stds, p4_stds, pv_stds]
+
+    chad_max = [3.07, 8.27, 7.55, 5.89, 5.42, 5.47]
+    p4_max = [3.68, 4.05, 5.46, 4.12, 2.18, 3.78]
+    pv_max = [2.00, 2.17, 3.26, 2.94, 2.33, 1.94]
+
+    x_pos = np.arange(len(labels))
+    CTEs = chad_means
+    error = chad_stds
+
+    # Build the plot
+    fig, ax = plt.subplots()
+    for i in range(3):
+        rects = ax.bar(x_pos + 0.2*i, mean_list[i],
+            # yerr=std_list[i],
+            width=0.2,
+            align='center',
+            alpha=0.5,
+            ecolor='black',
+            capsize=10,
+            label=exp_name[i])
+
+        
+        # ha = {'center': 'center', 'right': 'left', 'left': 'right'}
+        # offset = {'center': 0, 'right': 1, 'left': -1}
+        # xpos = 'center'
+        # # if i == 0:
+        # #     xpos = 'left'
+        # # elif i == 2:
+        # #     xpos = 'right'
+
+        # for rect in rects:
+        #     height = rect.get_height()
+        #     ax.annotate('{}'.format(height),
+        #                 xy=(rect.get_x() + rect.get_width() / 2, height),
+        #                 xytext=(offset[xpos]*3, 3),  # use 3 points offset
+        #                 textcoords="offset points",  # in both directions
+        #                 ha=ha[xpos], va='bottom', size=6.5)
+
+    ax.set_ylabel('Mean error (mm)')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels)
+    ax.set_title('Contour-based evaluation for final outcome')
+    ax.yaxis.grid(True)
+    ax.legend()
+
+    # Save the figure and show
+    plt.tight_layout()
+    # plt.savefig('bar_plot_with_error_bars.png')
+    plt.show()
+
+    # def autolabel(rects, xpos='center'):
+    #     """
+    #     Attach a text label above each bar .
+
+    #     *xpos* indicates which side to place the text w.r.t. the center of
+    #     the bar. It can be one of the following {'center', 'right', 'left'}.
+    #     """
+
+    #     ha = {'center': 'center', 'right': 'left', 'left': 'right'}
+    #     offset = {'center': 0, 'right': 1, 'left': -1}
+
+    #     for rect in rects:
+    #         height = rect.get_height()
+    #         ax.annotate('{}'.format(height),
+    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
+    #                     xytext=(offset[xpos]*3, 3),  # use 3 points offset
+    #                     textcoords="offset points",  # in both directions
+    #                     ha=ha[xpos], va='bottom')
+                        
+def volume_based_errors():
+    chad_means = [0.16, 0.2, 0.62, 0.32, 0.19, 1.33]
+    p4_means = [0.16, 0.16, 0.18, 0.16, 0.18, 0.18]
+    pv_means = [0.14, 0.58, 0.12, 0.16, 0.16, 0.23]
+    mean_list = [chad_means, p4_means, pv_means]
+
+    chad_stds = [0.3, 0.38, 1.43, 0.71, 0.34, 2.76]
+    p4_stds = [0.31, 0.33, 0.39, 0.36, 0.42, 0.4]
+    pv_stds = [0.28, 1.28, 0.25, 0.32, 0.35, 0.47]
+    std_list = [chad_stds, p4_stds, pv_stds]
+
+    chad_max = [1.43, 1.47, 7.08, 3.4, 1.85, 10.06]
+    p4_max = [1.46, 1.45, 2.53, 2.01, 2.81, 1.48]
+    pv_max = [1.42, 5.24, 1.49, 1.53, 2.1, 2.04]
+
+    x_pos = np.arange(len(labels))
+    CTEs = chad_means
+    error = chad_stds
+
+    # Build the plot
+    fig, ax = plt.subplots()
+    for i in range(3):
+        rects = ax.bar(x_pos + 0.2*i, mean_list[i],
+            # yerr=std_list[i],
+            width=0.2,
+            align='center',
+            alpha=0.5,
+            ecolor='black',
+            capsize=10,
+            label=exp_name[i])
+
+        
+        ha = {'center': 'center', 'right': 'left', 'left': 'right'}
+        offset = {'center': 0, 'right': 1, 'left': -1}
+        xpos = 'center'
+        # if i == 0:
+        #     xpos = 'left'
+        # elif i == 2:
+        #     xpos = 'right'
+
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(height),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(offset[xpos]*3, 3),  # use 3 points offset
+                        textcoords="offset points",  # in both directions
+                        ha=ha[xpos], va='bottom', size=6.5)
+
+    ax.set_ylabel('Mean errors (mm)')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels)
+    ax.set_title('Volume-based evaluation for final outcome')
+    ax.yaxis.grid(True)
+    ax.legend()
+
+    # Save the figure and show
+    plt.tight_layout()
+    # plt.savefig('bar_plot_with_error_bars.png')
+    plt.show()
+
+
+def defect_wall_errors():
+
+    chad_max = [7.08, 7.97]
+    pv_max = [3.33, 2.94]
+    max_list = [chad_max, pv_max]
+
+    chad_means = [3.30, 3.58]
+    pv_means = [1.24, 1.19]
+    mean_list = [chad_means, pv_means]
+
+    chad_stds = [[3.30, 3.58], [3.57, 4.05]]
+    pv_stds = [[1.24, 1.19], [1.36, 1.34]]
+    std_list = [chad_stds, pv_stds]
+
+
+    x_pos = np.arange(len(labels))
+
+    # Build the plot
+    fig, ax = plt.subplots()
+    for i in range(2):
+        rects = ax.bar(x_pos + 0.2*i, mean_list[i],
+            yerr=std_list[i],
+            width=0.2,
+            align='center',
+            alpha=0.5,
+            ecolor='black',
+            capsize=10,
+            label=exp_name[i])
+
+        # ax.scatter(x_pos + 0.2*i, max_list[i], color="0", alpha=.35)
+
+        
+        # ha = {'center': 'center', 'right': 'left', 'left': 'right'}
+        # offset = {'center': 0, 'right': 1, 'left': -1}
+        # xpos = 'center'
+        # # if i == 0:
+        # #     xpos = 'left'
+        # # elif i == 2:
+        # #     xpos = 'right'
+
+        # for rect in rects:
+        #     height = rect.get_height()
+        #     ax.annotate('{}'.format(height),
+        #                 xy=(rect.get_x() + rect.get_width() / 2, height),
+        #                 xytext=(offset[xpos]*3, 3),  # use 3 points offset
+        #                 textcoords="offset points",  # in both directions
+        #                 ha=ha[xpos], va='bottom', size=6.5)
+
+    ax.set_ylabel('Gap distance (mm)')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels)
+    # ax.set_title('Contour-based evaluation for final outcome')
+    ax.yaxis.grid(True)
+    ax.legend()
+
+    # Save the figure and show
+    plt.tight_layout()
+    # plt.savefig('bar_plot_with_error_bars.png')
+    plt.show()
+
+    # def autolabel(rects, xpos='center'):
+    #     """
+    #     Attach a text label above each bar .
+
+    #     *xpos* indicates which side to place the text w.r.t. the center of
+    #     the bar. It can be one of the following {'center', 'right', 'left'}.
+    #     """
+
+    #     ha = {'center': 'center', 'right': 'left', 'left': 'right'}
+    #     offset = {'center': 0, 'right': 1, 'left': -1}
+
+    #     for rect in rects:
+    #         height = rect.get_height()
+    #         ax.annotate('{}'.format(height),
+    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
+    #                     xytext=(offset[xpos]*3, 3),  # use 3 points offset
+    #                     textcoords="offset points",  # in both directions
+    #                     ha=ha[xpos], va='bottom')
+if __name__ == "__main__":
+    defect_wall_errors()
+
+
+    # chad_means = [2.25, 4.02, 2.47, 1.92, 1.78, 2.42]
+    # p4_means = [1.45, 1.59, 2.47, 1.78, 1.45, 1.71]
+    # pv_means = [0.92, 0.71, 1.40, 1.14, 0.80, 1.13]
+
+    # accum_chad = []
+    # accum_p4 = []
+    # for i in range(6):
+    #     diff_chad = chad_means[i] - pv_means[i]
+    #     diff_p4 = p4_means[i] - pv_means[i]
+    #     accum_chad.append(diff_chad/chad_means[i])
+    #     accum_p4.append(diff_p4/p4_means[i])
+
+
+    # chad = sum(accum_chad)/len(accum_chad)
+    # p4 = sum(accum_p4)/len(accum_p4)
+    # print(chad)
+    # print(p4)
+
+    # chad = sum(chad_means)/len(chad_means)
+    # p4 = sum(p4_means)/len(p4_means)
+    # pv = sum(pv_means)/len(pv_means)
+    # print((chad-pv)/chad)
+    # print((p4-pv)/p4)
