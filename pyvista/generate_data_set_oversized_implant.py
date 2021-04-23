@@ -134,7 +134,7 @@ class MainWidget(Qt.QWidget):
     def spline_skirt_clip_event(self):
         if self.implant_spline_widget is None:
             # 1. create implant spline skirt
-            self.plotter.add_spline_widget(self.implant_spline_callback, n_hanldes=len(self.implant_sphere_widgets), resolution=self.spline_resolution_spinbox.value(), pass_widget=True)
+            self.plotter.add_spline_widget(self.implant_spline_callback, n_handles=len(self.implant_sphere_widgets), resolution=self.spline_resolution_spinbox.value(), pass_widget=True)
             if self.line_widget is None:
                 self.plotter.add_slider_widget(self.slider_widget_callback, rng=(0,1), value=self.extrude_shrink_ratio)
                 self.plotter.add_line_widget(self.line_widget_callback, pass_widget=True)
@@ -226,6 +226,7 @@ class MainWidget(Qt.QWidget):
         
         # note: boolean operation is very computational expensive
         self.implant_mesh = self.mesh.boolean_cut(implant_spline_skirt)
+        # self.implant_mesh = self.mesh.boolean_difference(implant_spline_skirt)
         
         # fix mesh manifold using pymeshfix
         self.implant_mesh.save("temp_implant.stl")
