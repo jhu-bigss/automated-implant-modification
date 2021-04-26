@@ -47,7 +47,7 @@ mesh_head = pv.read(input_file)
 tree = cKDTree(mesh_head.points)
 
 plotter = pv.Plotter()
-plotter.add_mesh(mesh_head, name="head")
+plotter.add_mesh(mesh_head, rgb=True, name="head")
 poly = pv.PolyData() # center of fiducials
 
 # define point picking callback
