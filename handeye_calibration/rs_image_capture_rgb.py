@@ -6,10 +6,18 @@ import numpy as np
 import cv2
 import os
 import datetime
+import argparse
 
-# 1920x1080 for handeye calibration; 640x480 for tsdf fusion
-IMAGE_WIDTH = 640
-IMAGE_HEIGHT = 480
+parser = argparse.ArgumentParser(description='RealSense Camera Calibration')
+parser.add_argument('mode', type=int, help='0 - 640x480, 1 - 1920x1080')
+args = parser.parse_args()
+
+if args.mode == 0:
+    IMAGE_WIDTH = 640
+    IMAGE_HEIGHT = 480
+else:
+    IMAGE_WIDTH = 1920
+    IMAGE_HEIGHT = 1080
 
 # create a directory to save captured images 
 def create_image_directory():
