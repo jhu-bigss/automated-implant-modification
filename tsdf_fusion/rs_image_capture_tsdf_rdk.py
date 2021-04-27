@@ -254,7 +254,7 @@ class MainWidget(Qt.QWidget):
         n_imgs = len(glob.glob1(self.data_directory, "*.jpg"))
 
         # Load camera intrinsics
-        calib_file = os.path.join(self.data_directory, '../camera_params.yaml')
+        calib_file = os.path.join(self.data_directory, '../../handeye_calibration/camera_params_tsdf.yaml')
         calib_file = cv2.FileStorage(calib_file, cv2.FILE_STORAGE_READ)
         cam_intr = calib_file.getNode("intrinsic").mat()
 
