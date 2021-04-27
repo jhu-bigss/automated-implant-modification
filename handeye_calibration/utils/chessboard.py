@@ -1,6 +1,23 @@
-import os
+import os, glob
 import cv2
 import numpy as np
+
+def read_chessboard_image_from_dir(path, img_width, img_height, chessboard_width, chessboard_height, chessboard_square_size, calibrate_camera=False):
+    # --------- Load the world poses ------------ #
+    image_list = sorted(glob.glob(path + "*.jpg"))
+    images = [cv2.imread(file) for file in image_list]
+    c = ChessBoard(img_width, img_height, chessboard_width, chessboard_height, chessboard_square_size)
+
+    # ---------- Camera calibration ---------- #
+    if calibrate_camera:
+        # calibrate(total_frame, time_btw_frame)
+        c.calibrate(images, 300)
+        return
+
+    # ---------- Estimate the pose of calibration object w.r.t the camera ---------- #
+    T_eye2world = c.estimate_pose(images)
+
+    return T_eye2world
 
 class ChessBoard:
     def __init__(self, image_width, image_height, num_of_width, num_of_height, size_of_square):
@@ -64,7 +81,9 @@ class ChessBoard:
         cam_param_save_flag = input()
         if cam_param_save_flag == 'y':
             calib_file = cv2.FileStorage("camera_params.yaml", cv2.FILE_STORAGE_WRITE)
-            calib_file.write("intrinsic",mtx)
+            calib_file.write("image_width", self.image_width)
+            calib_file.write("image_height", self.image_height)
+            calib_file.write("intrinsic", mtx)
             calib_file.write("dist_coeff", dist)
             calib_file.release()
             print('Camera Parameters saved: ' + os.getcwd() + '/camera_params.yaml')

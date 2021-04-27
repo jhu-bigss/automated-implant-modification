@@ -2,7 +2,7 @@
 RoboDK capture images with RealSense camera based on PyQt
 """
 
-import os, sys, shutil
+import os, sys, shutil, glob
 import numpy as np
 
 from PyQt5 import Qt, QtCore
@@ -11,9 +11,9 @@ from robolink import *
 from robodk import *
 
 from utils.camerathread import CameraThread
-from utils import load_data
 from utils import calibrate
 from utils import compute_error
+from utils import chessboard
 
 data_foler = 'data/'
 
@@ -132,6 +132,18 @@ class MainWidget(Qt.QWidget):
             pos_e.append(pos_e_)
             ori_e.append(ori_e_)
         return pos_e, ori_e
+    
+    @staticmethod
+    def read_robot_pose_from_dir(path):
+        # ---------- Load the robot poses ---------- #
+        pose_txt_list = sorted(glob.glob(path + "*.txt"))
+        robot_poses = []
+        for file in pose_txt_list:
+            pose = np.loadtxt(file, delimiter=' ', usecols=range(4), dtype=float)
+            robot_poses.append(pose)
+        robot_poses = np.array(robot_poses)
+
+        return robot_poses
 
     def calibrate_handeye(self):
 
@@ -149,8 +161,8 @@ class MainWidget(Qt.QWidget):
         R_tol = 1e-7
 
         # Load data
-        T_robot = load_data.read_robot_pose_from_dir(self.data_directory)
-        T_eye = load_data.read_chessboard_image_from_dir(self.data_directory, 1920, 1080, 7, 6, 30)
+        T_robot = self.read_robot_pose_from_dir(self.data_directory)
+        T_eye = chessboard.read_chessboard_image_from_dir(self.data_directory, 1920, 1080, 7, 6, 30)
         num_of_poses = len(T_eye)
         if num_of_poses != len(T_robot):
             print("WARNING: load robot poses not equal to the number of images.")

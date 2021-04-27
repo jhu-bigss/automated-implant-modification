@@ -1,6 +1,5 @@
 import pyvista as pv
 import trimesh
-import cv2
 import numpy as np
 from scipy.spatial import cKDTree
 
