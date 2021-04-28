@@ -29,12 +29,11 @@ if not args.mesh_file or not args.radius:
 input_file = args.mesh_file
 data_dir = os.path.dirname(input_file)
 input_file_name = os.path.basename(input_file)
-output_file = os.path.splitext(input_file_name)[0] + ".csv"
+output_file = os.path.splitext(input_file_name)[0] + "_fiducials.csv"
 radius = args.radius
 neighbor_search_radius = radius * 1.6 # the factor can be tuned, the user is supposed to pick a point on the top of the sphere
 debug = args.debug
 sphere_color = "r" # "w"
-
 
 # load CT mesh
 # input_file = "../Spherical_fiducials_segmentation/TEST_30mm.ply" # change input file
@@ -110,7 +109,11 @@ def point_picking_callback(mesh, point_id):
 def key_callback():
     if poly.n_points > 0:
         # save center of fiducials
+<<<<<<< HEAD
         np.savetxt(output_file, poly.points, fmt='%.5f', delimiter=",")
+=======
+        np.savetxt(data_dir + '/' + output_file, poly.points, delimiter=",")
+>>>>>>> 5ef4166e401d4773aa7938f6452b2d98575c65cb
         print("csv file saved")
     else:
         print("No points to save")
