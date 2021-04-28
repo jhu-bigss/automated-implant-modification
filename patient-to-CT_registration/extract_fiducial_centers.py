@@ -110,7 +110,7 @@ def point_picking_callback(mesh, point_id):
 def key_callback():
     if poly.n_points > 0:
         # save center of fiducials
-        np.savetxt(output_file, poly.points, delimiter=",")
+        np.savetxt(output_file, poly.points, fmt='%.5f', delimiter=",")
         print("csv file saved")
     else:
         print("No points to save")
