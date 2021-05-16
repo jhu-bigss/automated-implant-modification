@@ -10,13 +10,14 @@ args = parser.parse_args()
 point_set_1 = np.loadtxt(args.input_1, delimiter=',')
 point_set_2 = np.loadtxt(args.input_2, delimiter=',')
 
-# Function borrowed from https://github.com/nghiaho12/rigid_transform_3D
+# Compute 3D transformation from two correspondence point set
 def rigid_transform_3D(A, B):
     '''
     Input: expects 3xN matrix of points
     Returns R,t
     R = 3x3 rotation matrix
     t = 3x1 column vector
+    This function is borrowed from https://github.com/nghiaho12/rigid_transform_3D
     '''
     assert A.shape == B.shape
 
@@ -67,6 +68,20 @@ H = np.concatenate((H,[[0,0,0,1]]), axis=0)
 # Save result to file
 # np.savetxt('result.csv', H.flatten()[None], fmt='%.5f')
 
-# Print result in terminal, copy/paste into Meshlab -> Matrix: Set/Copy Transformation
+# Print the transformation result in terminal, copy/paste into Meshlab -> Matrix: Set/Copy Transformation
 np.set_printoptions(suppress=True)
 print(*H.flatten(), sep=' ')
+
+# Compute FRE
+point_set_2_transformed = []
+for point in point_set_2:
+    point = np.matmul(R, point) + t.flatten()
+    point_set_2_transformed.append(point)
+point_set_2_transformed = np.array(point_set_2_transformed)
+
+error = point_set_2_transformed - point_set_1
+fre_err = 0
+for e in error:
+    fre_err = fre_err + np.dot(e, e)
+fre_err = np.sqrt(fre_err/len(error))
+print("FRE: ", fre_err, " mm")
