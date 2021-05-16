@@ -65,7 +65,7 @@ class MainWindow(Qt.QMainWindow):
 
         # Pyvista initialization
         self.plotter.show_axes()
-        self.plotter.remove_scalar_bar()
+        # self.plotter.remove_scalar_bar()
         self.fname = None
         self.mesh = None
         self.mesh_rgb = True
@@ -243,22 +243,34 @@ class MainWindow(Qt.QMainWindow):
             self.horizontalSlider_curvature.setSingleStep(10)
         
     def setup_color_range(self):
-        if self.mesh['RGB'] is not None:
+        try:
+            print("Detecting RGB")
             self.mesh['RGB-normed'] = np.array([np.linalg.norm(rgb) for rgb in self.mesh['RGB']])
-        elif self.mesh['RGBA'] is not None:
-            self.mesh['RGB-normed'] = np.array([np.linalg.norm(rgba[:3]) for rgba in self.mesh['RGBA']])
-        else:
+        except KeyError:
+            print("No RGB values exist")
             self.mesh_rgb = False
+        else:
+            self.mesh_rgb = True
+        try:
+            print("Detecting RGBA")
+            self.mesh['RGB-normed'] = np.array([np.linalg.norm(rgba[:3]) for rgba in self.mesh['RGBA']])
+        except KeyError:
+            print("No RGBA values exist")
+            self.mesh_rgb = False
+        else:
+            self.mesh_rgb = True
+
+        if self.mesh_rgb:
+            max_intensity = max(self.mesh['RGB-normed'])
+            min_intensity = min(self.mesh['RGB-normed'])
+            self.doubleSpinBox_color.setRange(min_intensity, max_intensity)
+            self.doubleSpinBox_color.setSingleStep(10)
+            self.horizontalSlider_color.setMaximum(int(max_intensity*100))
+            self.horizontalSlider_color.setMinimum(int(min_intensity*100))
+            self.horizontalSlider_color.setSingleStep(10)
+        else:
             self.doubleSpinBox_color.setEnabled(False)
             self.horizontalSlider_color.setEnabled(False)
-            return
-        max_intensity = max(self.mesh['RGB-normed'])
-        min_intensity = min(self.mesh['RGB-normed'])
-        self.doubleSpinBox_color.setRange(min_intensity, max_intensity)
-        self.doubleSpinBox_color.setSingleStep(10)
-        self.horizontalSlider_color.setMaximum(int(max_intensity*100))
-        self.horizontalSlider_color.setMinimum(int(min_intensity*100))
-        self.horizontalSlider_color.setSingleStep(10)
         
     def update_curvature_threshold(self, value):
         if isinstance(value, int):
@@ -391,7 +403,7 @@ class MainWindow(Qt.QMainWindow):
             if self.spline_widget is not None:
                 self.plotter.clear_spline_widgets()
                 self.spline_widget = None
-            self.plotter.add_spline_widget(self.spline_widget_callback, n_handles=len(self.curve_points), resolution=self.spinBox_spline_resolution.value(), closed=True, pass_widget=True, initial_points=self.curve_points)
+            self.plotter.add_spline_widget(self.spline_widget_callback, n_handles=len(self.curve_points), resolution=self.spinBox_spline_resolution.value(), color='red', closed=True, pass_widget=True, initial_points=self.curve_points)
         
         # remove mesh extracted
         self.plotter.remove_actor('mesh')
