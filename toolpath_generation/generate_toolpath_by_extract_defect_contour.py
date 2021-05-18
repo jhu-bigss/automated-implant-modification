@@ -490,22 +490,39 @@ class MainWindow(Qt.QMainWindow):
         lengths_vectors_tool = np.repeat(lengths_vectors_tool, 3, axis=1)
         vectors_tool = vectors_tool / lengths_vectors_tool
 
-        if len(invalid_vector_ids) > 0:
-            print("invalid vectors found")
-            print(invalid_vector_ids)
-            # find the neighboring and valid vectors, interpolate for invalid vectors_tool
-            valid_vector_ids = np.setdiff1d(np.arange(len(vectors_tool)), invalid_vector_ids)
-            insertion_vector_ids = np.searchsorted(valid_vector_ids, invalid_vector_ids) # Binary search to find the insertion position
-            for invalid_id, insertion_id in zip(invalid_vector_ids, insertion_vector_ids):
-                if insertion_id == len(valid_vector_ids):
-                    next_id = valid_vector_ids[0]
+        threshold_similarity = 0.95
+        iters = 0
+        while len(invalid_vector_ids) > 0 or iters == 0:
+            print("iters: " + str(iters))
+            if len(invalid_vector_ids) > 0:
+                print("invalid vectors found")
+                print(invalid_vector_ids)
+                # find the neighboring and valid vectors, interpolate for invalid vectors_tool
+                valid_vector_ids = np.setdiff1d(np.arange(len(vectors_tool)), invalid_vector_ids)
+                insertion_vector_ids = np.searchsorted(valid_vector_ids, invalid_vector_ids) # Binary search to find the insertion position
+                for invalid_id, insertion_id in zip(invalid_vector_ids, insertion_vector_ids):
+                    if insertion_id == len(valid_vector_ids):
+                        next_id = valid_vector_ids[0]
+                    else:
+                        next_id = valid_vector_ids[insertion_id]
+                    prev_id = valid_vector_ids[insertion_id - 1]
+                    vector_interpolated = (invalid_id - prev_id) * vectors_tool[prev_id] + (next_id - invalid_id) * vectors_tool[next_id]
+                    vector_interpolated = vector_interpolated / (next_id - prev_id)
+                    # update vector
+                    vectors_tool[invalid_id] = vector_interpolated
+            
+            # Find vectors with large change
+            invalid_vector_ids = []
+            for i, vector_tool in enumerate(vectors_tool):
+                if i == len(vectors_tool) - 1:
+                    next_vector  = vectors_tool[0]
                 else:
-                    next_id = valid_vector_ids[insertion_id]
-                prev_id = valid_vector_ids[insertion_id - 1]
-                vector_interpolated = (invalid_id - prev_id) * vectors_tool[prev_id] + (next_id - invalid_id) * vectors_tool[next_id]
-                vector_interpolated = vector_interpolated / (next_id - prev_id)
-                # update vector
-                vectors_tool[invalid_id] = vector_interpolated
+                    next_vector = vectors_tool[i+1]
+                similarity = np.dot(vector_tool, next_vector)
+                if similarity < threshold_similarity:
+                    invalid_vector_ids.append(i)
+            iters += 1
+            # self.plotter.add_arrows(self.spline_curve_fit.points[invalid_vector_ids], vectors_tool[invalid_vector_ids], mag=3, color='Yellow', name='Weird')
 
         return vectors_tool
 
