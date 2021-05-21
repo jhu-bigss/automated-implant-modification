@@ -4,7 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Define labels of the plot
-labels = ['plastic skull 1', 'plastic skull 2', 'cadaver1', 'cadaver2 CT-scan1', 'cadaver2 CT-scan2', 'cadaver2 scan1-scan2']
+labels = ['1st & 2nd 3D scans\n (Plastic Skull 1)',
+          '1st & 2nd 3D scans\n (Plastic Skull 2)',
+          'CT & single 3D scan\n (Cadaver 1)',
+          ' CT & 1st 3D scan\n (Cadaver 2)',
+          '1st & 2nd 3D scans\n (Cadaver2)',
+          'CT & 2nd 3D scan\n (Cadaver 2)'
+         ]
 
 def loadTREs(csv_files):
     """ load csv file for every TRE and convert to numpy array
@@ -19,12 +25,12 @@ def loadTREs(csv_files):
 
 def linkLabelToCSVFile():
     link = {
-        'plastic skull 1' : 'plastic_skull_1.csv',
-        'plastic skull 2' : 'plastic_skull_2.csv',
-        'cadaver1' : '1939m_CT_scan.csv',
-        'cadaver2 CT-scan1' : '1932f_CT_scan1.csv',
-        'cadaver2 CT-scan2' : '1932f_CT_scan2.csv',
-        'cadaver2 scan1-scan2' : '1932f_scan1_scan2.csv',
+        labels[0] : 'plastic_skull_1.csv',
+        labels[1] : 'plastic_skull_2.csv',
+        labels[2] : '1939m_CT_scan.csv',
+        labels[3] : '1932f_CT_scan1.csv',
+        labels[4] : '1932f_scan1_scan2.csv',
+        labels[5] : '1932f_CT_scan2.csv',
     }
 
     return link
@@ -44,6 +50,7 @@ def plot_TREs(TREs, dict_label_to_CSVFile):
         if len(errors) > 1:
             # input (x1, x2), (y1, y2) for plotting a line, where the coords of the two point are (x1, y1), (x2, y2)
             ax.plot([i - mean_bar_length/2, i + mean_bar_length/2], [np.mean(errors), np.mean(errors)])
+        print("mean error:", np.mean(errors), " mm")
 
     ax.set_ylabel('TRE (mm)')
     ax.set_xticks(x_pos)

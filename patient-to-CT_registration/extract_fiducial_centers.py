@@ -31,7 +31,7 @@ data_dir = os.path.dirname(input_file)
 input_file_name = os.path.basename(input_file)
 output_file = os.path.splitext(input_file_name)[0] + "_fiducials.csv"
 radius = args.radius
-neighbor_search_radius = radius * 1.6 # the factor can be tuned, the user is supposed to pick a point on the top of the sphere
+neighbor_search_radius = radius * 0.8 # the factor can be tuned, the user is supposed to pick a point on the top of the sphere
 debug = args.debug
 sphere_color = "r" # "w"
 
