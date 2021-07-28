@@ -4,7 +4,7 @@ from skspatial.objects import Line, Points, Plane
 
 import argparse
 
-parser = argparse.ArgumentParser(description='5-Axis Gcode Generation')
+parser = argparse.ArgumentParser(description='5-Axis Toolpath Generation')
 parser.add_argument('mesh_cci', metavar='INPUT_FILE', help='Input CCI mesh file path')
 parser.add_argument('mesh_defect', metavar='INPUT_FILE', help='Input defect edge mesh file path')
 parser.add_argument('transform_reg', metavar='INPUT_FILE', help='Input transformation file path')
@@ -25,14 +25,21 @@ mesh_defect_wall.transform(transform_mat, inplace=True)
 
 # Plotting Themes
 pv.global_theme.show_scalar_bar = False
-pv.global_theme.axes.show = True
 
-plotter = pv.Plotter()
+DEBUG = False
 
+if DEBUG:
+    from pyvistaqt import BackgroundPlotter
+    plotter = BackgroundPlotter()
+else:
+    plotter = pv.Plotter()
+
+plotter.add_axes()
+plotter.add_axes_at_origin(labels_off=True)
 plotter.add_mesh(mesh_implant, color='gray')
 plotter.add_mesh(mesh_defect_wall)
 
-# project vertices to plane
+# project vertices to plane (deprecated)
 # plane, center, normal = pv.fit_plane_to_points(mesh_defect_wall.points, return_meta=True)
 # plane_pv = pv.Plane(center=center, direction=normal, i_size=100, j_size=100)
 
@@ -41,11 +48,14 @@ center = np.array([0., 0., 0.])
 
 # generate cutting contour by the intersection of implant and fitted lines on defect wall
 num = 360
-angles_total = np.linspace(-np.pi, np.pi, num, endpoint=False)
+angles_total = np.linspace(np.pi/2, 5/2*np.pi, num, endpoint=False) # Start from Y+
 distance_threshold = 2
 radius = 1
 line_length = 10
 line_fitting = False
+
+tcp_points = []
+tcp_vectors = []
 
 for angle in angles_total:
 
@@ -84,14 +94,17 @@ for angle in angles_total:
         # Make sure all the direction are consistant
         if vec_u.dot(normal) <0:
             vec_u = -vec_u
-        
-    start_point = point_k
-    stop_point = point_k + vec_u * line_length
 
     # 4. ray-tracing for intersection
-    intersection_pt, ind = mesh_implant.ray_trace(start_point, stop_point)
+    intersection_pt, ind = mesh_implant.ray_trace(point_k, point_k + vec_u * line_length)
     if intersection_pt.any():
+        tcp_points.append(intersection_pt[0])
+        tcp_vectors.append(vec_u)
+        # Plotting
         plotter.add_points(intersection_pt, color='red')
         plotter.add_lines(np.array([intersection_pt[0], intersection_pt[0] + vec_u * line_length]), color="green")
+    
+toolpath = np.column_stack((tcp_points,tcp_vectors))
+np.savetxt("cldata.csv", toolpath)
 
 plotter.show()
