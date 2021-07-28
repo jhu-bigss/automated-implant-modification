@@ -10,9 +10,10 @@ output_file = os.path.splitext(args.toolpath)[0] + ".gcode"
 
 # Read toolpath from input file
 toolpath = np.genfromtxt(args.toolpath)
+num = len(toolpath)
 
 # B axis rotate 360 degree
-angles_total = np.linspace(0, 360, len(toolpath), endpoint=False)
+angles_total = np.linspace(0, 360, num, endpoint=False)
 z_axis = np.array([0., 0., 1.])
 
 file = open(output_file, 'w')
@@ -23,14 +24,14 @@ file.write("\n")
 
 # Parameters
 A_axis_offset = 92  # Machine home position to vertical z_axis offset
-feed_rate = 5000
+feed_rate = 500 # What is the best Feedrate for laser cutting?
 laser_power = 100
 
 rotary_center_to_rotary_top = 125  # mm
-rotary_center_to_laser_head_x = 103
-rotary_center_to_laser_head_y = 210
-rotary_center_to_laser_head_z = 214
-laser_focal_len = 23
+rotary_center_to_machine_x = 103.5
+rotary_center_to_machine_y = 212.5
+rotary_center_to_machine_z = 211.5
+laser_focal_len = 23.0
 
 def inv_kins(th1, th2, p):
     """
@@ -66,10 +67,12 @@ def inv_kins(th1, th2, p):
     # tf_W_O = np.linalg.inv(tf_O_W)
 
     tf_L_O = np.empty((4,4))
-    tf_L_O[:3,:3] = np.eye(3)
-    tf_L_O[:3,3] = np.array([-rotary_center_to_laser_head_x,
-                            rotary_center_to_laser_head_y,
-                            -rotary_center_to_laser_head_z+laser_focal_len])
+    tf_L_O[:3,:3] = np.array([[1, 0, 0],
+                              [0, -1, 0],
+                              [0, 0, -1]])  # Rotate about x-axis by 180 degree
+    tf_L_O[:3,3] = np.array([-rotary_center_to_machine_x,
+                            -rotary_center_to_machine_y,
+                            rotary_center_to_machine_z-laser_focal_len])
     tf_L_O[3,:] = [0, 0, 0, 1]
     # tf_O_L = np.linalg.inv(tf_L_O)
 
@@ -79,6 +82,7 @@ def inv_kins(th1, th2, p):
 
     return p_in_L[:3]
     
+XYZAB_start = None
 
 for n, th_2 in enumerate(angles_total):
     point_in_W = toolpath[n,:3]
@@ -92,13 +96,16 @@ for n, th_2 in enumerate(angles_total):
     # 2. Rotating along {W}_Z_axis clockwise
     th_2 = -th_2
 
-    # 3. Get the X, Y, Z -axes values
+    # 3. Get the X, Y, Z -axes joint values, need to invert Z
     XYZ = inv_kins(th_1, th_2, point_in_W)
+    XYZ[-1] = -XYZ[-1]
 
     # 4. Append the A, B -axes values
     XYZAB = np.append(XYZ, [th_1 - A_axis_offset, th_2])
 
     if n == 0:
+        # Save the starting point to add at the end to close the toolpath
+        XYZAB_start = XYZAB
         line = "G0 X%.3f  Y%.3f  Z%.3f A%.3f B%.3f\n" %(XYZAB[0], XYZAB[1], XYZAB[2], XYZAB[3], XYZAB[4])
         file.write(line)
         line = "G1 F" + str(feed_rate) + "    ; Feed rate\n"
@@ -109,8 +116,12 @@ for n, th_2 in enumerate(angles_total):
         line = "X%.3f  Y%.3f  Z%.3f A%.3f B%.3f\n" %(XYZAB[0], XYZAB[1], XYZAB[2], XYZAB[3], XYZAB[4])
         file.write(line)
 
-file.write("M5          ; Disable Laser")
-file.write("G0 Y-200 Z0 A-90")
+        if n == num-1:
+            line = "X%.3f  Y%.3f  Z%.3f A%.3f B%.3f\n" %(XYZAB_start[0], XYZAB_start[1], XYZAB_start[2], XYZAB_start[3], -360)
+            file.write(line)
+
+file.write("M5          ; Disable Laser\n")
+file.write("G0 Y-280 Z0 A-90")
 
 # Close the file after writing
 file.close()
