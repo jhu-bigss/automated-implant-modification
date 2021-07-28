@@ -121,7 +121,7 @@ for n, th_2 in enumerate(angles_total):
             file.write(line)
 
 file.write("M5          ; Disable Laser\n")
-file.write("G0 Y-280 Z0 A-90")
+file.write("G0 X-280 Y-280 Z0 A-90")
 
 # Close the file after writing
 file.close()
