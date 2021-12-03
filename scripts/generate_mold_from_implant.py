@@ -32,8 +32,8 @@ class MainWidget(Qt.QWidget):
         # Enable dragging and dropping onto the GUI
         self.setAcceptDrops(True)
 
-        self.plotter.show_axes()
         self.mesh = None
+        self.plotter.show_axes()
 
         if show:
             self.show()
@@ -79,9 +79,11 @@ class MainWidget(Qt.QWidget):
     def load_mesh(self):
         self.mesh = pv.read(self.fname)
         self.plotter.clear()
-        self.plotter.add_mesh(self.mesh, show_edges=True)
+        # self.plotter.add_mesh(self.mesh, show_edges=True)
+        self.plotter.add_mesh(self.mesh.smooth(100))
         # self.plotter.reset_camera()
-        self.plotter.add_slider_widget(self.adjust_feature_edge_extraction, rng=(0, 180))
+        self.plotter.add_slider_widget(callback=self.adjust_feature_edge_extraction, rng=(0, 180))
+        self.plotter.enable_point_picking(callback=self.select_feature_edges, show_message=False, use_mesh=True)
 
     def save_mesh(self):
         """
@@ -93,8 +95,12 @@ class MainWidget(Qt.QWidget):
         self.close()
 
     def adjust_feature_edge_extraction(self, value):
-        self.edges = self.mesh.extract_feature_edges(value, non_manifold_edges=False)
+        self.edges = self.mesh.extract_feature_edges(feature_angle=value, boundary_edges=False, non_manifold_edges=False)
         self.plotter.add_mesh(self.edges, color="red", line_width=5, name="edges")
+
+    def select_feature_edges(self, picked_mesh, picked_point_id):
+        point = picked_mesh.points[picked_point_id]
+        print(point)
 
 if __name__ == '__main__':
     app = Qt.QApplication(sys.argv)
