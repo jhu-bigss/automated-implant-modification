@@ -6,7 +6,7 @@ from pyvista import global_theme
 from pyvistaqt import MainWindow, QtInteractor
 from pyvistaqt.counter import Counter
 from pyvistaqt.dialog import FileDialog, ScaleAxesDialog
-from pyvistaqt.editor import Editor
+from editor import Editor
 from pyvistaqt.utils import (
     _check_type,
     _create_menu_bar,
@@ -16,7 +16,7 @@ from pyvistaqt.utils import (
 )
 
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import QApplication, QAction, QFrame, QGestureEvent, QGridLayout, QMenuBar, QToolBar, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QAction, QFrame, QSplitter, QGestureEvent, QGridLayout, QMenuBar, QToolBar, QHBoxLayout, QWidget
 
 
 LOG = logging.getLogger("pyvistaqt")
@@ -113,7 +113,6 @@ class BigssPlotter(QtInteractor):
         
         # editor
         self.editor: Optional[Editor] = None
-        self._editor_action: QAction = None
 
         self.active = True
         self.counters: List[Counter] = []
@@ -122,22 +121,27 @@ class BigssPlotter(QtInteractor):
         self.off_screen = _setup_off_screen(off_screen)
 
         self.app_window = MainWindow(title=kwargs.get("title", global_theme.title))
-        self.frame = QFrame(parent=self.app_window)
+        self.splitter = QSplitter(parent=self.app_window)
+        self.frame = QFrame(parent=self.splitter)
         self.frame.setFrameStyle(QFrame.NoFrame)
         super().__init__(parent=self.frame, off_screen=off_screen, **kwargs)
         assert not self._closed
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(self)
-        self.frame.setLayout(vlayout)
-        self.app_window.setCentralWidget(self.frame)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self)
+        self.frame.setLayout(hlayout)
+        self.splitter.addWidget(self.frame)
+        if editor:
+            self.add_editor()
+            self.splitter.addWidget(self.editor)
+            self.splitter.setStretchFactor(0, 2)
+            self.splitter.setStretchFactor(1, 1)
+        self.app_window.setCentralWidget(self.splitter)
         self.app_window.grabGesture(QtCore.Qt.PinchGesture)
         self.app_window.signal_gesture.connect(self.gesture_event)
         self.app_window.signal_close.connect(self._close)
 
         if menu_bar:
             self.add_menu_bar()
-            if editor:
-                self.add_editor()
         if toolbar:
             self.add_toolbars()
 
@@ -149,6 +153,7 @@ class BigssPlotter(QtInteractor):
     def _add_mesh(self, show: bool = True) -> FileDialog:
         def add_mesh_from_file(filename):
             self.add_mesh(pv.read(filename), rgb=True)
+            self.editor.update()
 
         return FileDialog(
             self.app_window,
@@ -309,9 +314,10 @@ class BigssPlotter(QtInteractor):
 
         view_menu.addSeparator()
         # Orientation marker
-        orien_menu = view_menu.addMenu("Orientation Marker")
-        orien_menu.addAction("Show All", self.show_axes_all)
-        orien_menu.addAction("Hide All", self.hide_axes_all)
+        orien_marker_visilibity = view_menu.addAction("Orientation Marker")
+        orien_marker_visilibity.setCheckable(True)
+        orien_marker_visilibity.toggled.connect(self.set_orien_marker)
+
         # Bounds axes
         axes_menu = view_menu.addMenu("Bounds Axes")
         axes_menu.addAction("Add Bounds Axes (front)", self.show_bounds)
@@ -324,10 +330,20 @@ class BigssPlotter(QtInteractor):
         # A final separator to separate OS options
         view_menu.addSeparator()
 
-    def add_editor(self) -> None:
+    def set_orien_marker(self, show : bool):
+        if show:
+            self.show_axes_all()
+        else:
+            self.hide_axes_all()
+
+    def clear(self):
+        """Override the clear function"""
+        super().clear()
+        self.editor.update()
+
+    def add_editor(self) -> Editor:
         """Add the editor."""
         self.editor = Editor(parent=self.app_window, renderers=self.renderers)
-        self._editor_action = self.main_menu.addAction("Editor", self.editor.toggle)
         self.app_window.signal_close.connect(self.editor.close)
 
     def close(self) -> None:
@@ -354,6 +370,7 @@ class BigssPlotter(QtInteractor):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    bplt = BigssPlotter()
-    bplt.add_mesh(pv.Sphere())
+    plotter = BigssPlotter()
+    plotter.add_mesh(pv.Sphere())
+    plotter.editor.update()
     sys.exit(app.exec_())
