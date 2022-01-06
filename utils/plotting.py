@@ -196,7 +196,7 @@ class BigssPlotter(QtInteractor):
             Number of times `func` will be called. If None,
             `func` will be called until the main window is closed.
         """
-        self._callback_timer = QTimer(parent=self.app_window)
+        self._callback_timer = QtCore.QTimer(parent=self.app_window)
         self._callback_timer.timeout.connect(func)
         self._callback_timer.start(interval)
         self.app_window.signal_close.connect(self._callback_timer.stop)
@@ -300,23 +300,25 @@ class BigssPlotter(QtInteractor):
         )
         view_menu.addAction("Clear All", self.clear)
 
-        tool_menu = self.main_menu.addMenu("Tools")
-        tool_menu.addAction("Enable Cell Picking (through)", self.enable_cell_picking)
-        tool_menu.addAction(
-            "Enable Cell Picking (visible)",
-            lambda: self.enable_cell_picking(through=False),
-        )
-
         cam_menu = view_menu.addMenu("Camera")
         self._parallel_projection_action = cam_menu.addAction(
             "Toggle Parallel Projection", self._toggle_parallel_projection
         )
 
+        tool_menu = self.main_menu.addMenu("Tools")
+        picking_menu = tool_menu.addMenu("Picking")
+        picking_menu.addAction("Enable Point Picking", self.enable_point_picking)
+        picking_menu.addAction("Enable Cell Picking (through)", self.enable_cell_picking)
+        picking_menu.addAction(
+            "Enable Cell Picking (visible)",
+            lambda: self.enable_cell_picking(through=False),
+        )
+
         view_menu.addSeparator()
         # Orientation marker
-        orien_marker_visilibity = view_menu.addAction("Orientation Marker")
+        orien_marker_visilibity = view_menu.addAction("Show Axes")
         orien_marker_visilibity.setCheckable(True)
-        orien_marker_visilibity.toggled.connect(self.set_orien_marker)
+        orien_marker_visilibity.toggled.connect(self.set_show_axes)
 
         # Bounds axes
         axes_menu = view_menu.addMenu("Bounds Axes")
@@ -330,11 +332,11 @@ class BigssPlotter(QtInteractor):
         # A final separator to separate OS options
         view_menu.addSeparator()
 
-    def set_orien_marker(self, show : bool):
-        if show:
-            self.show_axes_all()
+    def set_show_axes(self, state : bool):
+        if state:
+            self.renderer.show_axes()
         else:
-            self.hide_axes_all()
+            self.renderer.hide_axes()
 
     def clear(self):
         """Override the clear function"""
