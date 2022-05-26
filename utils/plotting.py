@@ -1,8 +1,6 @@
 import os, sys, logging
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
-# os.environ["QT_API"] = "pyside6"
-
 import pyvista as pv
 from pyvista import global_theme
 from pyvistaqt import MainWindow, QtInteractor
@@ -18,8 +16,7 @@ from pyvistaqt.utils import (
 )
 
 from qtpy import QtCore
-from qtpy.QtGui import QAction
-from qtpy.QtWidgets import QApplication, QFrame, QSplitter, QGestureEvent, QGridLayout, QMenuBar, QToolBar, QHBoxLayout, QWidget
+from qtpy.QtWidgets import QApplication, QFrame, QAction, QSplitter, QGestureEvent, QGridLayout, QMenuBar, QToolBar, QHBoxLayout, QWidget
 
 LOG = logging.getLogger("pyvistaqt")
 LOG.setLevel(logging.CRITICAL)
