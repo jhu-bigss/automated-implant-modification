@@ -1,4 +1,4 @@
-import sys, os, vtk
+import sys, os
 
 import pyvista as pv
 import numpy as np
@@ -6,6 +6,7 @@ import numpy as np
 from PyQt5 import Qt, QtCore, uic
 from pyvistaqt import QtInteractor
 
+import vtkmodules
 
 class MainWindow(Qt.QMainWindow):
 
