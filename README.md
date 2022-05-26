@@ -15,7 +15,7 @@ This repository provides packages for modifying cranial imlants using a KUKA LBR
 
 ## Requirements
 
-- Python 3.7 with [NumPy](http://www.numpy.org/), [SciPy](https://www.scipy.org/), [OpenCV](https://opencv.org/), [pyrealsense2](https://pypi.org/project/pyrealsense/), [robodk](https://pypi.org/project/robodk/), [pytransform3d](https://github.com/rock-learning/pytransform3d). These can be quickly installed/updated by running the following:
+- Python >= 3.7 with [NumPy](http://www.numpy.org/), [SciPy](https://www.scipy.org/), [OpenCV](https://opencv.org/), [pyrealsense2](https://pypi.org/project/pyrealsense/), [robodk](https://pypi.org/project/robodk/), [pytransform3d](https://github.com/rock-learning/pytransform3d). These can be quickly installed/updated by running the following:
 
 ```shell
 pip install pyrealsense2 / primesense
@@ -24,6 +24,8 @@ pip install pyrealsense2 / primesense
 ```shell
 pip install numpy scipy opencv-python robodk
 ```
+
+* [PyVista](https://docs.pyvista.org/getting-started/index.html#installation) and [PyVistaQt](https://qtdocs.pyvista.org/#getting-started)
 
 For plotting hand-calibration result using matplotlib, [pytransform3d](https://pypi.org/project/pytransform3d/) is required:
 
