@@ -8,4 +8,4 @@ data/
 *.ply
 *.stl
 
-COLCON_IGNORE
+data/
